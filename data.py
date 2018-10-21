@@ -73,7 +73,6 @@ class Vocab(object):
       for i in xrange(self.size()):
         writer.writerow({"word": self._id_to_word[i]})
 
-
 def example_generator(data_path, single_pass):
   while True:
     filelist = glob.glob(data_path) # get the list of datafiles

@@ -5,11 +5,11 @@ import time
 
 import tensorflow as tf
 import torch
-from model import Model
 from torch.nn.utils import clip_grad_norm_
 
 from custom_adagrad import AdagradCustom
 
+from model import Model
 import config
 from batcher import Batcher
 from data import Vocab
@@ -20,10 +20,12 @@ use_cuda = config.use_gpu and torch.cuda.is_available()
 class Train(object):
     def __init__(self):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
+        
+        print("building batcher...")
         self.batcher = Batcher(config.train_data_path, self.vocab, mode='train',
                                batch_size=config.batch_size, single_pass=False)
         time.sleep(15)
-
+        
         train_dir = os.path.join(config.log_root, 'train_%d' % (int(time.time())))
         if not os.path.exists(train_dir):
             os.mkdir(train_dir)
@@ -51,6 +53,7 @@ class Train(object):
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
                  list(self.model.reduce_state.parameters())
+    
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         self.optimizer = AdagradCustom(params, lr=initial_lr, initial_accumulator_value=config.adagrad_init_acc)
 
@@ -116,6 +119,7 @@ class Train(object):
         return loss.item()
 
     def trainIters(self, n_iters, model_file_path=None):
+        print("Start training...")
         iter, running_avg_loss = self.setup_train(model_file_path)
         start = time.time()
         while iter < n_iters:
