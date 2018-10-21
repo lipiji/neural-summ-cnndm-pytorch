@@ -1,214 +1,124 @@
-from __future__ import unicode_literals, print_function, division
-
+# -*- coding: utf-8 -*-
+#pylint: skip-file
+import sys
+import numpy as np
 import torch
+import torch as T
 import torch.nn as nn
-#import torch.nn.functional as F
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-from numpy import random
+from torch.autograd import Variable
 
-import config
+from utils_pg import *
+from gru_dec import *
+from lstm_dec_v4 import *
+from word_prob_layer import *
 
-use_cuda = config.use_gpu and torch.cuda.is_available()
+class Model(nn.Module):
+    def __init__(self, modules, consts, options):
+        super(Model, self).__init__()  
+        
+        self.has_learnable_w2v = options["has_learnable_w2v"]
+        self.is_predicting = options["is_predicting"]
+        self.is_bidirectional = options["is_bidirectional"]
+        self.has_lvt_trick = options["has_lvt_trick"]
+        self.beam_decoding = options["beam_decoding"]
+        self.cell = options["cell"]
+        self.device = options["device"]
+        self.copy = options["copy"]
+        self.coverage = options["coverage"]
 
-random.seed(123)
-torch.manual_seed(123)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(123)
+        self.dim_x = consts["dim_x"]
+        self.dim_y = consts["dim_y"]
+        self.len_x = consts["len_x"]
+        self.len_y = consts["len_y"]
+        self.hidden_size = consts["hidden_size"]
+        self.dict_size = consts["dict_size"] 
+        self.pad_token_idx = consts["pad_token_idx"] 
+        self.ctx_size = self.hidden_size * 2 if self.is_bidirectional else self.hidden_size
+        if self.has_lvt_trick:
+            self.lvt_dict_size = consts["lvt_dict_size"]
 
-def init_lstm_wt(lstm):
-    for names in lstm._all_weights:
-        for name in names:
-            if name.startswith('weight_'):
-                wt = getattr(lstm, name)
-                wt.data.uniform_(-config.rand_unif_init_mag, config.rand_unif_init_mag)
-            elif name.startswith('bias_'):
-                # set forget bias to 1
-                bias = getattr(lstm, name)
-                n = bias.size(0)
-                start, end = n // 4, n // 2
-                bias.data.fill_(0.)
-                bias.data[start:end].fill_(1.)
-
-def init_linear_wt(linear):
-    linear.weight.data.normal_(std=config.trunc_norm_init_std)
-    if linear.bias is not None:
-        linear.bias.data.normal_(std=config.trunc_norm_init_std)
-
-def init_wt_normal(wt):
-    wt.data.normal_(std=config.trunc_norm_init_std)
-
-def init_wt_unif(wt):
-    wt.data.uniform_(-config.rand_unif_init_mag, config.rand_unif_init_mag)
-
-class Encoder(nn.Module):
-    def __init__(self):
-        super(Encoder, self).__init__()
-        self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
-        init_wt_normal(self.embedding.weight)
-
-        self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        init_lstm_wt(self.lstm)
-
-    #seq_lens should be in descending order
-    def forward(self, input, seq_lens):
-        embedded = self.embedding(input)
-
-        packed = pack_padded_sequence(embedded, seq_lens, batch_first=True)
-        output, hidden = self.lstm(packed)
-
-        h, _ = pad_packed_sequence(output, batch_first=True)  # h dim = B x t_k x n
-        h = h.contiguous()
-        max_h, _ = h.max(dim=1)
-
-        return h, hidden, max_h
-
-class ReduceState(nn.Module):
-    def __init__(self):
-        super(ReduceState, self).__init__()
-
-        self.reduce_h = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
-        init_linear_wt(self.reduce_h)
-        self.reduce_c = nn.Linear(config.hidden_dim * 2, config.hidden_dim)
-        init_linear_wt(self.reduce_c)
-
-    def forward(self, hidden):
-        h, c = hidden # h, c dim = 2 x b x hidden_dim
-        hidden_reduced_h = torch.relu(self.reduce_h(h.view(-1, config.hidden_dim * 2)))
-        hidden_reduced_c = torch.relu(self.reduce_c(c.view(-1, config.hidden_dim * 2)))
-
-        return (hidden_reduced_h.unsqueeze(0), hidden_reduced_c.unsqueeze(0)) # h, c dim = 1 x b x hidden_dim
-
-class Attention(nn.Module):
-    def __init__(self):
-        super(Attention, self).__init__()
-        # attention
-        self.W_h = nn.Linear(config.hidden_dim * 2, config.hidden_dim * 2, bias=False)
-        if config.is_coverage:
-            self.W_c = nn.Linear(1, config.hidden_dim * 2, bias=False)
-        self.decode_proj = nn.Linear(config.hidden_dim * 2, config.hidden_dim * 2)
-        self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
-
-    def forward(self, s_t_hat, h, enc_padding_mask, coverage):
-        b, t_k, n = list(h.size())
-        h = h.view(-1, n)  # B * t_k x 2*hidden_dim
-        encoder_feature = self.W_h(h)
-
-        dec_fea = self.decode_proj(s_t_hat) # B x 2*hidden_dim
-        dec_fea_expanded = dec_fea.unsqueeze(1).expand(b, t_k, n).contiguous() # B x t_k x 2*hidden_dim
-        dec_fea_expanded = dec_fea_expanded.view(-1, n)  # B * t_k x 2*hidden_dim
-
-        att_features = encoder_feature + dec_fea_expanded # B * t_k x 2*hidden_dim
-        if config.is_coverage:
-            coverage_input = coverage.view(-1, 1)  # B * t_k x 1
-            coverage_feature = self.W_c(coverage_input)  # B * t_k x 2*hidden_dim
-            att_features = att_features + coverage_feature
-
-        e = torch.tanh(att_features) # B * t_k x 2*hidden_dim
-        scores = self.v(e)  # B * t_k x 1
-        scores = scores.view(-1, t_k)  # B x t_k
-
-        attn_dist_ = torch.softmax(scores, dim=1)*enc_padding_mask # B x t_k
-        normalization_factor = attn_dist_.sum(1, keepdim=True)
-        attn_dist = attn_dist_ / normalization_factor
-
-        attn_dist = attn_dist.unsqueeze(1)  # B x 1 x t_k
-        h = h.view(-1, t_k, n)  # B x t_k x 2*hidden_dim
-        c_t = torch.bmm(attn_dist, h)  # B x 1 x n
-        c_t = c_t.view(-1, config.hidden_dim * 2)  # B x 2*hidden_dim
-
-        attn_dist = attn_dist.view(-1, t_k)  # B x t_k
-
-        if config.is_coverage:
-            coverage = coverage.view(-1, t_k)
-            coverage = coverage + attn_dist
-
-        return c_t, attn_dist, coverage
-
-class Decoder(nn.Module):
-    def __init__(self):
-        super(Decoder, self).__init__()
-        self.attention_network = Attention()
-        # decoder
-        self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
-        init_wt_normal(self.embedding.weight)
-
-        self.x_context = nn.Linear(config.hidden_dim * 2 + config.emb_dim, config.emb_dim)
-
-        self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=False)
-        init_lstm_wt(self.lstm)
-
-        if config.pointer_gen:
-            self.p_gen_linear = nn.Linear(config.hidden_dim * 4 + config.emb_dim, 1)
-
-        #p_vocab
-        self.out1 = nn.Linear(config.hidden_dim * 3, config.hidden_dim)
-        self.out2 = nn.Linear(config.hidden_dim, config.vocab_size)
-        init_linear_wt(self.out2)
-
-    def forward(self, y_t_1, s_t_1, encoder_outputs, enc_padding_mask,
-                c_t_1, extra_zeros, enc_batch_extend_vocab, coverage):
-
-        y_t_1_embd = self.embedding(y_t_1)
-        x = self.x_context(torch.cat((c_t_1, y_t_1_embd), 1))
-        lstm_out, s_t = self.lstm(x.unsqueeze(1), s_t_1)
-
-        h_decoder, c_decoder = s_t
-        s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim),
-                             c_decoder.view(-1, config.hidden_dim)), 1)  # B x 2*hidden_dim
-        c_t, attn_dist, coverage = self.attention_network(s_t_hat, encoder_outputs,
-                                                          enc_padding_mask, coverage)
-
-        p_gen = None
-        if config.pointer_gen:
-            p_gen_input = torch.cat((c_t, s_t_hat, x), 1)  # B x (2*2*hidden_dim + emb_dim)
-            p_gen = self.p_gen_linear(p_gen_input)
-            p_gen = torch.sigmoid(p_gen)
-
-        output = torch.cat((lstm_out.view(-1, config.hidden_dim), c_t), 1) # B x hidden_dim * 3
-        output = self.out1(output) # B x hidden_dim
-
-        #output = F.relu(output)
-
-        output = self.out2(output) # B x vocab_size
-        vocab_dist = torch.softmax(output, dim=1)
-
-        if config.pointer_gen:
-            vocab_dist_ = p_gen * vocab_dist
-            attn_dist_ = (1 - p_gen) * attn_dist
-
-            if extra_zeros is not None:
-                vocab_dist_ = torch.cat([vocab_dist_, extra_zeros], 1)
-
-            final_dist = vocab_dist_.scatter_add(1, enc_batch_extend_vocab, attn_dist_)
+        self.w_rawdata_emb = nn.Embedding(self.dict_size, self.dim_x, self.pad_token_idx)
+        if self.cell == "gru":
+            self.encoder = nn.GRU(self.dim_x, self.hidden_size, bidirectional=self.is_bidirectional)
+            self.decoder = GRUAttentionDecoder(self.dim_y, self.hidden_size, self.ctx_size, self.device, self.copy, self.coverage)
         else:
-            final_dist = vocab_dist
+            self.encoder = nn.LSTM(self.dim_x, self.hidden_size, bidirectional=self.is_bidirectional)
+            self.decoder = LSTMAttentionDecoder(self.dim_y, self.hidden_size, self.ctx_size, self.device, self.copy, self.coverage)
+            
+        self.get_dec_init_state = nn.Linear(self.ctx_size, self.hidden_size)
+        self.word_prob = WordProbLayer(self.hidden_size, self.ctx_size, self.dim_y, self.dict_size, self.device, self.copy, self.coverage)
 
-        return final_dist, s_t, c_t, attn_dist, p_gen, coverage
+        self.init_weights()
 
-class Model(object):
-    def __init__(self, model_file_path=None, is_eval=False):
-        encoder = Encoder()
-        decoder = Decoder()
-        reduce_state = ReduceState()
+    def init_weights(self):
+        init_uniform_weight(self.w_rawdata_emb.weight)
+        init_gru_weight(self.encoder)
+        init_linear_weight(self.get_dec_init_state)
 
-        # shared the embedding between encoder and decoder
-        decoder.embedding.weight = encoder.embedding.weight
-        if is_eval:
-            encoder = encoder.eval()
-            decoder = decoder.eval()
-            reduce_state = reduce_state.eval()
+    def categorical_crossentropy_avg(self, y_pred, y, y_mask):
+        y_flat = y.view(-1)
+        y_flat_idx = T.arange(y_flat.size(0)).to(self.device) * self.dict_size + y_flat
+        cost = -T.log(y_pred.view(-1)[y_flat_idx])
+        cost = cost.view(y.shape)
+        y_mask = y_mask.view(y.shape)
+        cost = T.sum(cost * y_mask, 0) / T.sum(y_mask, 0) 
+        cost = cost.view((y.size(1), -1))
+        return T.mean(cost)
 
-        if use_cuda:
-            encoder = encoder.cuda()
-            decoder = decoder.cuda()
-            reduce_state = reduce_state.cuda()
+    def categorical_crossentropy(self, y_pred, y, y_mask):
+        y_flat = y.view(-1)
+        y_flat_idx = T.arange(y_flat.size(0)).to(self.device) * self.dict_size + y_flat
+        cost = -T.log(y_pred.view(-1)[y_flat_idx])
+        cost = cost.view(y.shape)
+        cost = T.sum(cost * y_mask.view(y.shape), 0)
+        cost = cost.view((y.size(1), -1))
+        return T.mean(cost) 
+    
+    def encode(self, x, len_x, mask_x):
+        self.encoder.flatten_parameters()
+        emb_x = self.w_rawdata_emb(x)
+        
+        emb_x = torch.nn.utils.rnn.pack_padded_sequence(emb_x, len_x)
+        hs, hn = self.encoder(emb_x, None)
+        hs, _ = torch.nn.utils.rnn.pad_packed_sequence(hs)
+         
+        dec_init_state = T.sum(hs * mask_x, 0) / T.sum(mask_x, 0)
+        dec_init_state = T.tanh(self.get_dec_init_state(dec_init_state))
+        return hs, dec_init_state
 
-        self.encoder = encoder
-        self.decoder = decoder
-        self.reduce_state = reduce_state
+    def decode_once(self, x, y, hs, dec_init_state, mask_x):
+        batch_size = hs.size(1)
+        if T.sum(y) < 0:
+            y_emb = Variable(T.zeros((1, batch_size, self.dim_y))).to(self.device)
+        else:
+            y_emb = self.w_rawdata_emb(y)
+        mask_y = Variable(T.ones((1, batch_size, 1))).to(self.device)
 
-        if model_file_path is not None:
-            state = torch.load(model_file_path, map_location= lambda storage, location: storage)
-            self.encoder.load_state_dict(state['encoder_state_dict'])
-            self.decoder.load_state_dict(state['decoder_state_dict'], strict=False)
-            self.reduce_state.load_state_dict(state['reduce_state_dict'])
+        hcs, dec_status, atted_context, att_dist, xids = self.decoder(y_emb, hs, dec_init_state, mask_x, mask_y, x)
+        y_pred = self.word_prob(hcs, dec_status, atted_context, y_emb, att_dist, xids)
+       
+        return y_pred, hcs
+    
+
+    def forward(self, x, len_x, y, hidden=None, mask_x=None, mask_y=None):
+        
+        hs, dec_init_state = self.encode(x, len_x, mask_x)
+
+        y_emb = self.w_rawdata_emb(y)
+        y_shifted = y_emb[:-1, :, :]
+        y_shifted = T.cat((Variable(torch.zeros(1, *y_shifted[0].size())).to(self.device), y_shifted), 0)
+        h0 = dec_init_state
+        if self.cell == "lstm":
+            h0 = (dec_init_state, dec_init_state)
+        
+        hcs, dec_status, atted_context, att_dist, xids = self.decoder(y_shifted, hs, h0, mask_x, mask_y, x)
+        y_pred = self.word_prob(hcs, dec_status, atted_context, y_shifted, att_dist, xids)
+        cost = self.categorical_crossentropy(y_pred, y, mask_y)
+        return y_pred, cost
+    
+    def init_hidden(self, batch_size):
+        if self.cell == "lstm":
+            return (Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)),
+                    Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)))
+        return Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size))
+
