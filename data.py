@@ -14,7 +14,9 @@ class BatchData:
         is_lvt = options["has_lvt_trick"]
         self.batch_size = len(flist) 
         self.x = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64)
+        self.x_ext = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64)
         self.y = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64)
+        self.y_ext = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64)
         self.x_lvt = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64) if is_lvt else None
         self.y_lvt = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64) if is_lvt else None
         self.x_mask = np.zeros((consts["len_x"], self.batch_size, 1), dtype = np.int64)
@@ -23,9 +25,13 @@ class BatchData:
         self.len_y = []
         self.original_contents = []
         self.original_summarys = []
+        self.x_ext_words = []
+        self.max_ext_len = 0
 
         w2i = modules["w2i"]
         i2w = modules["i2w"]
+        dict_size = len(w2i)
+        
         if is_lvt:
             hfw = modules["freq_words"]
             lvt_dict_size = consts["lvt_dict_size"]
@@ -44,43 +50,41 @@ class BatchData:
             summary, original_summary = summarys
             self.original_contents.append(original_content)
             self.original_summarys.append(original_summary)
-
+            xi_oovs = []
             for idx_word in xrange(len(content)):
                     # some sentences in duc is longer than len_x
                     if idx_word == consts["len_x"]:
                         break
                     w = content[idx_word]
                     
-                    # remove eos for duc dataset
-                    if options["omit_eos"] and w == i2w[modules["eos_emb"]]:
-                        break
-                    # words in duc dataset may not in dict
-                    if w not in w2i: # duc
+                    if w not in w2i: # OOV
+                        if w not in xi_oovs:
+                            xi_oovs.append(w)
+                        self.x_ext[idx_word, idx_doc] = dict_size + xi_oovs.index(w) # 500005, 51000
                         w = i2w[modules["lfw_emb"]]
-
+                    else:
+                        self.x_ext[idx_word, idx_doc] = w2i[w]
+                    
                     self.x[idx_word, idx_doc] = w2i[w]
-                    if is_lvt:
-                        if w not in lvt_w2i:
-                            lvt_w2i[w] = len(lvt_dict)
-                            lvt_dict.append(w2i[w])
-                        self.x_lvt[idx_word, idx_doc] = lvt_w2i[w]
                     self.x_mask[idx_word, idx_doc, 0] = 1
             self.len_x.append(np.sum(self.x_mask[:, idx_doc, :]))
+            self.x_ext_words.append(xi_oovs)
+            if self.max_ext_len < len(xi_oovs):
+                self.max_ext_len = len(xi_oovs)
 
             if options["has_y"]:
                 for idx_word in xrange(len(summary)):
                     w = summary[idx_word]
                     
                     if w not in w2i:
+                        if w in xi_oovs:
+                            self.y_ext[idx_word, idx_doc] = dict_size + xi_oovs.index(w)
+                        else:
+                            self.y_ext[idx_word, idx_doc] = w2i[i2w[modules["lfw_emb"]]] # unk
                         w = i2w[modules["lfw_emb"]] 
-
+                    else:
+                        self.y_ext[idx_word, idx_doc] =  w2i[w]
                     self.y[idx_word, idx_doc] = w2i[w]
-                    if is_lvt:
-                        if not options["is_predicting"]:
-                            if w not in lvt_w2i:
-                                lvt_w2i[w] = len(lvt_dict)
-                                lvt_dict.append(w2i[w])
-                            self.y_lvt[idx_word, idx_doc] = lvt_w2i[w]
                     if not options["is_predicting"]:
                         self.y_mask[idx_word, idx_doc, 0] = 1
                 self.len_y.append(len(summary))
@@ -91,8 +95,10 @@ class BatchData:
         max_len_y = int(np.max(self.len_y))
         
         self.x = self.x[0:max_len_x, :]
+        self.x_ext = self.x_ext[0:max_len_x, :]
         self.x_mask = self.x_mask[0:max_len_x, :, :]
         self.y = self.y[0:max_len_y, :]
+        self.y_ext = self.y_ext[0:max_len_y, :]
         self.y_mask = self.y_mask[0:max_len_y, :, :]
 
 

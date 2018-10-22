@@ -74,6 +74,14 @@ class Model(nn.Module):
         cost = cost.view((y.size(1), -1))
         return T.mean(cost) 
     
+    def categorical_crossentropy_copy(self, y_pred, y, y_mask):
+        cost = -T.log(T.gather(y_pred, 2, y.view(y.size(0), y.size(1), 1)))
+        cost = cost.view(y.shape)
+        cost = T.sum(cost * y_mask.view(y.shape), 0)
+        cost = cost.view((y.size(1), -1))
+        return T.mean(cost) 
+    
+
     def encode(self, x, len_x, mask_x):
         self.encoder.flatten_parameters()
         emb_x = self.w_rawdata_emb(x)
@@ -86,7 +94,7 @@ class Model(nn.Module):
         dec_init_state = T.tanh(self.get_dec_init_state(dec_init_state))
         return hs, dec_init_state
 
-    def decode_once(self, x, y, hs, dec_init_state, mask_x):
+    def decode_once(self, x, y, hs, dec_init_state, mask_x, max_ext_len):
         batch_size = hs.size(1)
         if T.sum(y) < 0:
             y_emb = Variable(T.zeros((1, batch_size, self.dim_y))).to(self.device)
@@ -95,12 +103,12 @@ class Model(nn.Module):
         mask_y = Variable(T.ones((1, batch_size, 1))).to(self.device)
 
         hcs, dec_status, atted_context, att_dist, xids = self.decoder(y_emb, hs, dec_init_state, mask_x, mask_y, x)
-        y_pred = self.word_prob(hcs, dec_status, atted_context, y_emb, att_dist, xids)
+        y_pred = self.word_prob(dec_status, atted_context, y_emb, att_dist, xids, max_ext_len)
        
         return y_pred, hcs
     
 
-    def forward(self, x, len_x, y, hidden=None, mask_x=None, mask_y=None):
+    def forward(self, x, len_x, y, mask_x, mask_y, x_ext, y_ext, max_ext_len, hidden=None):
         
         hs, dec_init_state = self.encode(x, len_x, mask_x)
 
@@ -111,9 +119,9 @@ class Model(nn.Module):
         if self.cell == "lstm":
             h0 = (dec_init_state, dec_init_state)
         
-        hcs, dec_status, atted_context, att_dist, xids = self.decoder(y_shifted, hs, h0, mask_x, mask_y, x)
-        y_pred = self.word_prob(hcs, dec_status, atted_context, y_shifted, att_dist, xids)
-        cost = self.categorical_crossentropy(y_pred, y, mask_y)
+        hcs, dec_status, atted_context, att_dist, xids = self.decoder(y_shifted, hs, h0, mask_x, mask_y, x_ext)
+        y_pred = self.word_prob(dec_status, atted_context, y_shifted, att_dist, xids, max_ext_len)
+        cost = self.categorical_crossentropy_copy(y_pred, y_ext, mask_y)
         return y_pred, cost
     
     def init_hidden(self, batch_size):

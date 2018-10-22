@@ -197,7 +197,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
     last_scores = torch.FloatTensor(np.zeros(1)).cuda()
     last_states = []
 
-    x, word_emb, dec_state, x_mask, y, len_y, ref_sents = batch
+    x, word_emb, dec_state, x_mask, y, len_y, ref_sents, max_ext_len, oovs = batch
     next_y = torch.LongTensor(-np.ones((1, num_live, 1), dtype="int64")).cuda()
     x = x.unsqueeze(1)
     word_emb = word_emb.unsqueeze(1)
@@ -211,7 +211,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
         tile_x_mask = x_mask.repeat(1, num_live, 1)
         tile_x = x.repeat(1, num_live)
 
-        y_pred, dec_state = model.decode_once(tile_x, next_y, tile_word_emb, dec_state, tile_x_mask)
+        y_pred, dec_state = model.decode_once(tile_x, next_y, tile_word_emb, dec_state, tile_x_mask, max_ext_len)
         dict_size = y_pred.shape[-1]
         y_pred = y_pred.view(num_live, dict_size)
     
@@ -331,6 +331,164 @@ def beam_decode(fname, batch, model, modules, consts, options):
     write_summ("".join((cfg.cc.BEAM_GT_PATH, fname)), y_true, 1, options, modules["i2w"])
         #print "================="
 
+def beam_decode_copy(fname, batch, model, modules, consts, options):
+    fname = str(fname)
+
+    beam_size = consts["beam_size"]
+    num_live = 1
+    num_dead = 0
+    samples = []
+    sample_scores = np.zeros(beam_size)
+
+    last_traces = [[]]
+    last_scores = torch.FloatTensor(np.zeros(1)).cuda()
+    last_states = []
+
+    x, word_emb, dec_state, x_mask, y, len_y, ref_sents, max_ext_len, oovs = batch
+    next_y = torch.LongTensor(-np.ones((1, num_live, 1), dtype="int64")).cuda()
+    x = x.unsqueeze(1)
+    word_emb = word_emb.unsqueeze(1)
+    x_mask = x_mask.unsqueeze(1)
+    dec_state = dec_state.unsqueeze(0)
+    if options["cell"] == "lstm":
+        dec_state = (dec_state, dec_state)
+    
+    for step in xrange(consts["max_len_predict"]):
+        tile_word_emb = word_emb.repeat(1, num_live, 1)
+        tile_x_mask = x_mask.repeat(1, num_live, 1)
+        tile_x = x.repeat(1, num_live)
+
+        y_pred, dec_state = model.decode_once(tile_x, next_y, tile_word_emb, dec_state, tile_x_mask, max_ext_len)
+        dict_size = y_pred.shape[-1]
+        y_pred = y_pred.view(num_live, dict_size)
+    
+        if options["cell"] == "lstm":
+            dec_state = (dec_state[0].view(num_live, dec_state[0].shape[-1]), dec_state[1].view(num_live, dec_state[1].shape[-1]))
+        else:
+            dec_state = dec_state.view(num_live, dec_state.shape[-1])
+  
+        cand_scores = last_scores + torch.log(y_pred) # 分数最大越好
+        cand_scores = cand_scores.flatten()
+        idx_top_joint_scores = torch.topk(cand_scores, beam_size - num_dead)[1]
+
+
+        idx_last_traces = idx_top_joint_scores / dict_size
+        idx_word_now = idx_top_joint_scores % dict_size
+        top_joint_scores = cand_scores[idx_top_joint_scores]
+
+        traces_now = []
+        scores_now = np.zeros((beam_size - num_dead))
+        states_now = []
+        
+        for i, [j, k] in enumerate(zip(idx_last_traces, idx_word_now)):
+            traces_now.append(last_traces[j] + [k])
+            scores_now[i] = copy.copy(top_joint_scores[i])
+            if options["cell"] == "lstm":
+                states_now.append((copy.copy(dec_state[0][j, :]), copy.copy(dec_state[1][j, :])))
+            else:
+                states_now.append(copy.copy(dec_state[j, :]))
+
+
+        num_live = 0
+        last_traces = []
+        last_scores = []
+        last_states = []
+
+        for i in xrange(len(traces_now)):
+            if traces_now[i][-1] == modules["eos_emb"] and len(traces_now[i]) >= consts["min_len_predict"]:
+                samples.append([str(e.item()) for e in traces_now[i][:-1]])
+                sample_scores[num_dead] = scores_now[i]
+                num_dead += 1
+            else:
+                last_traces.append(traces_now[i])
+                last_scores.append(scores_now[i])
+                last_states.append(states_now[i])
+                num_live += 1
+        if num_live == 0 or num_dead >= beam_size:
+            break
+
+        last_scores = torch.FloatTensor(np.array(last_scores).reshape((num_live, 1))).cuda()
+        next_y = []
+        for e in last_traces:
+            eid = e[-1].item()
+            if eid in modules["i2w"]:
+                next_y.append(eid)
+            else:
+                next_y.append(modules["lfw_emb"]) # unk
+        next_y = np.array(next_y).reshape((1, num_live))
+        next_y = torch.LongTensor(next_y).cuda()
+        if options["cell"] == "lstm":
+            h_states = []
+            c_states = []
+            for state in last_states:
+                h_states.append(state[0])
+                c_states.append(state[1])
+            dec_state = (torch.stack(h_states).view((num_live, h_states[0].shape[-1])),\
+                         torch.stack(c_states).view((num_live, c_states[0].shape[-1])))
+        else:
+            dec_state = torch.stack(last_states).view((num_live, dec_state.shape[-1]))
+        assert num_live + num_dead == beam_size
+
+    if num_live > 0:
+        for i in xrange(num_live):
+            samples.append([str(e.item()) for e in last_traces[i]])
+            sample_scores[num_dead] = last_scores[i]
+            num_dead += 1
+    
+    #weight by length
+    for i in xrange(len(sample_scores)):
+        sent_len = float(len(samples[i]))
+        sample_scores[i] = sample_scores[i] #*  math.exp(-sent_len / 10)
+
+    idx_sorted_scores = np.argsort(sample_scores) # 低分到高分
+    if options["has_y"]:
+        ly = len_y[0]
+        y_true = y[0 : ly].tolist()
+        y_true = [str(i) for i in y_true[:-1]] # delete <eos>
+
+    sorted_samples = []
+    sorted_scores = []
+    filter_idx = []
+    for e in idx_sorted_scores:
+        if len(samples[e]) >= consts["min_len_predict"]:
+            filter_idx.append(e)
+    if len(filter_idx) == 0:
+        filter_idx = idx_sorted_scores
+    for e in filter_idx:
+        sorted_samples.append(samples[e])
+        sorted_scores.append(sample_scores[e])
+
+    num_samples = len(sorted_samples)
+    if len(sorted_samples) == 1:
+        sorted_samples = sorted_samples[0]
+        num_samples = 1
+
+    if options["prediction_bytes_limitation"]:
+        for i in xrange(len(sorted_samples)):
+            sample = sorted_samples[i]
+            b = 0
+            for j in xrange(len(sample)):
+                b += len(sample[j])
+                if b > consts["max_byte_predict"]:
+                    sorted_samples[i] = sorted_samples[i][0 : j]
+                    break
+
+    dec_words = []
+
+    for e in sorted_samples[-1]:
+        e = int(e)
+        if e in modules["i2w"]:
+            dec_words.append(modules["i2w"][e])
+        else:
+            dec_words.append(oovs[e - len(modules["i2w"])])
+    # for rouge
+    write_for_rouge(fname, ref_sents, dec_words, cfg)
+
+    # beam search history
+    write_summ_copy("".join((cfg.cc.BEAM_SUMM_PATH, fname)), sorted_samples, num_samples, options, modules["i2w"], oovs, sorted_scores)
+    write_summ_copy("".join((cfg.cc.BEAM_GT_PATH, fname)), y_true, 1, options, modules["i2w"], oovs)
+        #print "================="
+
 
 def predict(model, modules, consts, options):
     print "start predicting,"
@@ -345,7 +503,7 @@ def predict(model, modules, consts, options):
     rebuild_dir(cfg.cc.SUMM_PATH)
 
     print "loading test set..."
-    xy_list = pickle.load(open(cfg.cc.VALIDATE_DATA_PATH + "valid.pkl", "r")) 
+    xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "ibm.pkl", "r")) 
     batch_list, num_files, num_batches = datar.batched(len(xy_list), options, consts)
 
     print "num_files = ", num_files, ", num_batches = ", num_batches
@@ -359,14 +517,18 @@ def predict(model, modules, consts, options):
         batch_raw = [xy_list[xy_idx] for xy_idx in test_idx]
         batch = datar.get_data(batch_raw, modules, consts, options)
 
-        x, len_x, x_mask, y, len_y, y_mask, oy = sort_samples(batch.x, batch.len_x, batch.x_mask, batch.y, batch.len_y, batch.y_mask, batch.original_summarys)
+        x, len_x, x_mask, y, len_y, y_mask, oy, x_ext, y_ext, oovs = sort_samples(batch.x, batch.len_x, \
+                                                             batch.x_mask, batch.y, batch.len_y, batch.y_mask, \
+                                                             batch.original_summarys, batch.x_ext, batch.y_ext, batch.x_ext_words)
+                    
         word_emb, dec_state = model.encode(torch.LongTensor(x).cuda(), torch.LongTensor(len_x).cuda(), torch.FloatTensor(x_mask).cuda())
 
         if options["beam_decoding"]:
             for idx_s in xrange(word_emb.size(1)):
-                inputx = (torch.LongTensor(x[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
-                          torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s])
-                beam_decode(si, inputx, model, modules, consts, options)
+                inputx = (torch.LongTensor(x_ext[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
+                          torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s],\
+                          batch.max_ext_len, oovs[idx_s])
+                beam_decode_copy(si, inputx, model, modules, consts, options)
                 si += 1
         else:
             inputx = (word_emb, dec_state, torch.FloatTensor(x_mask).cuda(), y, len_y)
@@ -398,7 +560,7 @@ def run(existing_model_name = None):
     if training_model:
         print "loading train set..."
         if options["is_debugging"]:
-            xy_list = pickle.load(open(cfg.cc.VALIDATE_DATA_PATH + "valid.pkl", "r")) 
+            xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "test.pkl", "r")) 
         else:
             xy_list = pickle.load(open(cfg.cc.TRAINING_DATA_PATH + "train.pkl", "r")) 
         batch_list, num_files, num_batches = datar.batched(len(xy_list), options, consts)
@@ -408,20 +570,18 @@ def run(existing_model_name = None):
     if True: #TODO: refactor
         print "compiling model ..." 
         model = Model(modules, consts, options)
-        criterion = nn.NLLLoss(ignore_index=consts["pad_token_idx"])
+        #criterion = nn.NLLLoss(ignore_index=consts["pad_token_idx"])
         if options["cuda"]:
             model.cuda()
-            criterion.cuda()
+            #criterion.cuda()
             #model = nn.DataParallel(model)
-        #optimizer = torch.optim.Adadelta(model.parameters(), lr=consts["lr"], rho=0.95)
         optimizer = torch.optim.Adagrad(model.parameters(), lr=consts["lr"], initial_accumulator_value=0.1)
-        #optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         
         model_name = "cnndm.s2s"
         existing_epoch = 0
         if need_load_model:
             if existing_model_name == None:
-                existing_model_name = "cnndm.s2s.gpu5.epoch14.1"
+                existing_model_name = "cnndm.s2s.gpu5.epoch5.5"
             print "loading existed model:", existing_model_name
             model, optimizer = load_model(cfg.cc.MODEL_PATH + existing_model_name, model, optimizer)
 
@@ -456,12 +616,15 @@ def run(existing_model_name = None):
                     local_batch_size = len(batch_raw)
                     batch = datar.get_data(batch_raw, modules, consts, options)
                   
-                    x, len_x, x_mask, y, len_y, y_mask, oy = sort_samples(batch.x, batch.len_x, \
-                                                             batch.x_mask, batch.y, batch.len_y, batch.y_mask, batch.original_summarys)
+                    x, len_x, x_mask, y, len_y, y_mask, oy, x_ext, y_ext, oovs = sort_samples(batch.x, batch.len_x, \
+                                                             batch.x_mask, batch.y, batch.len_y, batch.y_mask, \
+                                                             batch.original_summarys, batch.x_ext, batch.y_ext, batch.x_ext_words)
                     
                     model.zero_grad()
                     y_pred, cost = model(torch.LongTensor(x).cuda(), torch.LongTensor(len_x).cuda(),\
-                                   torch.LongTensor(y).cuda(), None, torch.FloatTensor(x_mask).cuda(), torch.FloatTensor(y_mask).cuda())
+                                   torch.LongTensor(y).cuda(),  torch.FloatTensor(x_mask).cuda(), \
+                                   torch.FloatTensor(y_mask).cuda(), torch.LongTensor(x_ext).cuda(), torch.LongTensor(y_ext).cuda(), \
+                                   batch.max_ext_len, None)
                     
                     cost.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
@@ -484,10 +647,7 @@ def run(existing_model_name = None):
                 print "in this epoch, total average cost =", total_error / used_batch, ",", 
                 print "time:", time.time() - epoch_start
 
-                if options["has_lvt_trick"]:
-                    print_sent_dec(y_pred, batch.y, batch.y_mask, modules, consts, options, local_batch_size, batch.lvt_dict)
-                else:
-                    print_sent_dec(y_pred, y, y_mask, modules, consts, options, local_batch_size)
+                print_sent_dec(y_pred, y_ext, y_mask, oovs, modules, consts, options, local_batch_size)
                 
                 if last_total_error > total_error or options["is_debugging"]:
                     last_total_error = total_error

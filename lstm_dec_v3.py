@@ -8,12 +8,14 @@ import math
 from utils_pg import *
 
 class LSTMAttentionDecoder(nn.Module):
-    def __init__(self, input_size, hidden_size, ctx_size, device):
+    def __init__(self, input_size, hidden_size, ctx_size, device, copy, coverage):
         super(LSTMAttentionDecoder, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.ctx_size = ctx_size
         self.device = device
+        self.copy = copy
+        self.coverage = coverage 
         
         self.lstm_1 = nn.LSTMCell(self.input_size, self.hidden_size)
 
@@ -38,7 +40,7 @@ class LSTMAttentionDecoder(nn.Module):
         init_ortho_weight(self.W_comb_att)
         init_ortho_weight(self.U_att)
 
-    def forward(self, y_emb, context, init_state, x_mask, y_mask):
+    def forward(self, y_emb, context, init_state, x_mask, y_mask, xid):
         
         def _get_word_atten(pctx, h1, x_mask):
             h = F.linear(h1, self.W_comb_att)
@@ -72,28 +74,35 @@ class LSTMAttentionDecoder(nn.Module):
             c2 = y_mask * c2 + (1.0 - y_mask) * c1
             h2 = y_mask * h2 + (1.0 - y_mask) * h1
 
-            return (h2, c2), h2, atted_ctx
+            word_atten_ = T.transpose(word_atten.view(x_mask.size(0), -1), 0, 1)
+            return (h2, c2), h2, atted_ctx, word_atten_
 
         hs = []
         cs = []
         ss = []
         atts = []
+        dists = [] 
+        xids = []
         steps = range(y_emb.size(0))
         hidden = init_state #Variable(torch.zeros(y_emb.size(1), self.hidden_size)).to(self.device)
-        
+        xid = T.transpose(xid, 0, 1)
         pctx = F.linear(context, self.Wc_att, self.b_att)
         x = y_emb
         for i in steps:
-            hidden, s, att = recurrence(x[i], y_mask[i], hidden, pctx, context, x_mask)
+            hidden, s, att, att_dist = recurrence(x[i], y_mask[i], hidden, pctx, context, x_mask)
             hs.append(hidden[0])
             cs.append(hidden[1])
             ss.append(s)
             atts.append(att)
+            dists.append(att_dist)
+            xids.append(xid)
 
         hs = T.cat(hs, 0).view(y_emb.size(0), *hs[0].size())
         cs = T.cat(cs, 0).view(y_emb.size(0), *cs[0].size())
         ss = T.cat(ss, 0).view(y_emb.size(0), *ss[0].size())
         atts = T.cat(atts, 0).view(y_emb.size(0), *atts[0].size())
-        return (hs, cs), ss, atts
+        dists = T.cat(dists, 0).view(y_emb.size(0), *dists[0].size())
+        xids = T.cat(xids, 0).view(y_emb.size(0), *xids[0].size())
+        return (hs, cs), ss, atts, dists, xids
 
 

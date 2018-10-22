@@ -19,15 +19,15 @@ class WordProbLayer(nn.Module):
         self.copy = copy
         self.coverage = coverage
 
-        self.w_ds = nn.Parameter(torch.Tensor(self.hidden_size, self.ctx_size + self.hidden_size))
+        self.w_ds = nn.Parameter(torch.Tensor(self.hidden_size, self.hidden_size + self.ctx_size + self.dim_y))
         self.b_ds = nn.Parameter(torch.Tensor(self.hidden_size)) 
         self.w_logit = nn.Parameter(torch.Tensor(self.dict_size, self.hidden_size))
         self.b_logit = nn.Parameter(torch.Tensor(self.dict_size)) 
- 
-        self.v = nn.Parameter(torch.Tensor(1, 2*self.hidden_size + self.ctx_size + self.dim_y))
-        self.bv = nn.Parameter(torch.Tensor(1))
 
-       
+        if self.copy:
+            self.v = nn.Parameter(torch.Tensor(1, self.hidden_size + self.ctx_size + self.dim_y))
+            self.bv = nn.Parameter(torch.Tensor(1))
+
         self.init_weights()
 
     def init_weights(self):
@@ -35,21 +35,21 @@ class WordProbLayer(nn.Module):
         init_bias(self.b_ds)
         init_xavier_weight(self.w_logit)
         init_bias(self.b_logit)
+        if self.copy:
+            init_xavier_weight(self.v)
+            init_bias(self.bv)
 
-        init_xavier_weight(self.v)
-        init_bias(self.bv)
 
-
-    def forward(self, hcs, ds, ac, y_emb, att_dist, xids):
-        # copy
-        h_cp = T.cat((ac, hcs[0], hcs[1], y_emb), 2)
-        g = T.sigmoid(F.linear(h_cp, self.v, self.bv))
-        self.pred_cp = g
-
-        logit = T.cat((ds, ac), 2)
-        logit = F.linear(logit, self.w_ds, self.b_ds)
+    def forward(self, ds, ac, y_emb, att_dist, xids, max_ext_len):
+        h = T.cat((ds, ac, y_emb), 2)
+        logit = T.tanh(F.linear(h, self.w_ds, self.b_ds))
         logit = F.linear(logit, self.w_logit, self.b_logit)
         y_dec = T.softmax(logit, dim = 2)
-
-        y_dec =  (g * y_dec).scatter_add(2, xids, (1 - g) * att_dist)
+        
+        if self.copy:
+            ext_zeros = Variable(torch.zeros(y_dec.size(0), y_dec.size(1), max_ext_len)).to(self.device)
+            y_dec = T.cat((y_dec, ext_zeros), 2)
+            g = T.sigmoid(F.linear(h, self.v, self.bv))
+            y_dec = (g * y_dec).scatter_add(2, xids, (1 - g) * att_dist)
+        
         return y_dec

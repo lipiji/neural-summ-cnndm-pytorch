@@ -119,11 +119,12 @@ def read_head(f_head, cfg):
     line = ' '.join(sents)
     words = line.split()
     num_words = len(words)
-    if num_words >= cfg.MIN_LEN_Y and num_words < cfg.MAX_LEN_Y:
+    if num_words >= cfg.MIN_LEN_Y and num_words <= cfg.MAX_LEN_Y:
         lines += words
-    elif num_words >= cfg.MAX_LEN_Y:
-        lines = words[0:cfg.MAX_LEN_Y]
-    lines += [cfg.W_EOS]
+        lines += [cfg.W_EOS]
+    elif num_words > cfg.MAX_LEN_Y: # do not know if should be stoped
+        lines = words[0 : cfg.MAX_LEN_Y + 1] # one more word.
+    
     return (lines, sents) if len(lines) >= cfg.MIN_LEN_Y and len(lines) <= cfg.MAX_LEN_Y+1  else None
 
 def prepare_deepmind(d_path):
