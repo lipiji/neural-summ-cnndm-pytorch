@@ -236,7 +236,7 @@ def prepare_deepmind(d_path):
     print "dump test..."
     pickle.dump(test_xy_list, open(TESTING_PATH + "test.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     shuffle(test_xy_list)
-    pickle.dump(test_xy_list[0:2000], open(TESTING_PATH + "ibm.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
+    pickle.dump(test_xy_list[0:2000], open(TESTING_PATH + "pj2000.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
 
     print "dump validate..."
     pickle.dump(valid_xy_list, open(VALIDATE_PATH + "valid.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
