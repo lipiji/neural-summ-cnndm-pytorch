@@ -251,7 +251,7 @@ if __name__ == "__main__":
 
     data_type = "deepmind"
     # download from finished_files: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail
-    raw_path = "./data/CNN-Dailymail/finished_files/"
+    raw_path = "/home/pijili/data/summarization-data/SDS/CNN-Dailymail/finished_files/"
 
     print data_type, raw_path
     run(data_type, raw_path)

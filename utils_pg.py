@@ -135,6 +135,30 @@ def print_sent_dec(y_pred, y, y_mask, oovs, modules, consts, options, batch_size
     print "----------------------------------------------------------------------------------------------------"
     print 
 
+
+def write_for_rouge(fname, ref_sents, dec_words, cfg):
+    dec_sents = []
+    while len(dec_words) > 0:
+        try:
+            fst_period_idx = dec_words.index(".")
+        except ValueError:
+            fst_period_idx = len(dec_words)
+        sent = dec_words[:fst_period_idx + 1]
+        dec_words = dec_words[fst_period_idx + 1:]
+        dec_sents.append(' '.join(sent))
+
+    ref_file = "".join((cfg.cc.GROUND_TRUTH_PATH, fname))
+    decoded_file = "".join((cfg.cc.SUMM_PATH, fname))
+
+    with open(ref_file, "w") as f:
+        for idx, sent in enumerate(ref_sents):
+            sent = sent.strip()
+            f.write(sent) if idx == len(ref_sents) - 1 else f.write(sent + "\n")
+    with open(decoded_file, "w") as f:
+        for idx, sent in enumerate(dec_sents):
+            sent = sent.strip()
+            f.write(sent) if idx == len(dec_sents) - 1 else f.write(sent + "\n")
+
 def write_summ(dst_path, summ_list, num_summ, options, i2w = None, score_list = None):
     is_unicode = options["is_unicode"]
     assert num_summ > 0
@@ -177,30 +201,6 @@ def write_summ(dst_path, summ_list, num_summ, options, i2w = None, score_list = 
 
                 f_summ.write(s)
                 f_summ.write("\n")
-
-
-def write_for_rouge(fname, ref_sents, dec_words, cfg):
-    dec_sents = []
-    while len(dec_words) > 0:
-        try:
-            fst_period_idx = dec_words.index(".")
-        except ValueError:
-            fst_period_idx = len(dec_words)
-        sent = dec_words[:fst_period_idx + 1]
-        dec_words = dec_words[fst_period_idx + 1:]
-        dec_sents.append(' '.join(sent))
-
-    ref_file = "".join((cfg.cc.GROUND_TRUTH_PATH, fname))
-    decoded_file = "".join((cfg.cc.SUMM_PATH, fname))
-
-    with open(ref_file, "w") as f:
-        for idx, sent in enumerate(ref_sents):
-            sent = sent.strip()
-            f.write(sent) if idx == len(ref_sents) - 1 else f.write(sent + "\n")
-    with open(decoded_file, "w") as f:
-        for idx, sent in enumerate(dec_sents):
-            sent = sent.strip()
-            f.write(sent) if idx == len(dec_sents) - 1 else f.write(sent + "\n")
 
 def write_summ_copy(dst_path, summ_list, num_summ, options, i2w = None, oovs=None, score_list = None):
     assert num_summ > 0

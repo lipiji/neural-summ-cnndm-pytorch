@@ -37,10 +37,10 @@ class DeepmindConfigs():
     
     cc = CommonConfigs("deepmind")
    
+    CELL = "lstm"
     CUDA = True
-    CELL = "gru"
     COPY = True
-    COVERAGE = False
+    COVERAGE = True
 
     DIM_X = 128
     DIM_Y = DIM_X

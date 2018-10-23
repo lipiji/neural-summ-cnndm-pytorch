@@ -40,7 +40,7 @@ class WordProbLayer(nn.Module):
             init_bias(self.bv)
 
 
-    def forward(self, ds, ac, y_emb, att_dist, xids, max_ext_len):
+    def forward(self, ds, ac, y_emb, att_dist=None, xids=None, max_ext_len=None):
         h = T.cat((ds, ac, y_emb), 2)
         logit = T.tanh(F.linear(h, self.w_ds, self.b_ds))
         logit = F.linear(logit, self.w_logit, self.b_logit)
