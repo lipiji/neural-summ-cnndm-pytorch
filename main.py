@@ -386,7 +386,7 @@ def predict(model, modules, consts, options):
     rebuild_dir(cfg.cc.SUMM_PATH)
 
     print "loading test set..."
-    xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "ibm.pkl", "r")) 
+    xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "pj2000.pkl", "r")) 
     batch_list, num_files, num_batches = datar.batched(len(xy_list), options, consts)
 
     print "num_files = ", num_files, ", num_batches = ", num_batches
