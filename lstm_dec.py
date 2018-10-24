@@ -36,6 +36,7 @@ class LSTMAttentionDecoder(nn.Module):
         self.init_weights()
 
     def init_weights(self):
+        init_lstm_weight(self.lstm_1)
         init_ortho_weight(self.Wx)
         init_ortho_weight(self.Ux)
         init_bias(self.bx)
@@ -48,7 +49,7 @@ class LSTMAttentionDecoder(nn.Module):
 
 
     def forward(self, y_emb, context, init_state, x_mask, y_mask, xid=None, init_coverage=None):
-        def _get_word_atten(pctx, h1, x_mask, acc_att=None): #acc_att: B * len(B)
+        def _get_word_atten(pctx, h1, x_mask, acc_att=None): #acc_att: B * len(x)
             if acc_att is not None:
                 h = F.linear(h1, self.W_comb_att) + F.linear(T.transpose(acc_att, 0, 1).unsqueeze(2), self.W_coverage) # len(x) * B * ?
             else:

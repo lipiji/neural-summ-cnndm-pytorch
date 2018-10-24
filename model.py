@@ -52,7 +52,10 @@ class Model(nn.Module):
 
     def init_weights(self):
         init_uniform_weight(self.w_rawdata_emb.weight)
-        init_gru_weight(self.encoder)
+        if self.cell == "gru": 
+            init_gru_weight(self.encoder)
+        else:
+            init_lstm_weight(self.encoder)
         init_linear_weight(self.get_dec_init_state)
     
     def categorical_crossentropy(self, y_pred, y, y_mask, avg=False):

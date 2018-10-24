@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-cudaid = 0
+cudaid = 5
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cudaid)
 
 import sys
@@ -544,12 +544,14 @@ def run(existing_model_name = None):
             last_total_error = float("inf")
             print "max epoch:", consts["max_epoch"]
             for epoch in xrange(0, consts["max_epoch"]):
+                '''
                 if not options["is_debugging"] and epoch == 5:
                     consts["lr"] *= 0.1
                     #adjust
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = consts["lr"]
-                
+                '''
+
                 print "epoch: ", epoch + existing_epoch
                 num_partial = 1
                 total_error = 0.0
@@ -585,7 +587,7 @@ def run(existing_model_name = None):
                         error_c += cost_c
                     
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
                     optimizer.step()
                     
                     cost = cost.item()
