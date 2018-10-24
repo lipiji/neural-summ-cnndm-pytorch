@@ -21,12 +21,12 @@ class DeepmindTraining(object):
     IS_UNICODE = False
     REMOVES_PUNCTION = False
     HAS_Y = True
-    BATCH_SIZE = 32#70
+    BATCH_SIZE = 32
 
 class DeepmindTesting(object):
     IS_UNICODE = False
     HAS_Y = True
-    BATCH_SIZE = 100 #1951
+    BATCH_SIZE = 100
     MIN_LEN_PREDICT = 35
     MAX_LEN_PREDICT = 120
     MAX_BYTE_PREDICT = None
@@ -37,7 +37,7 @@ class DeepmindConfigs():
     
     cc = CommonConfigs("deepmind")
    
-    CELL = "lstm"
+    CELL = "gru"
     CUDA = True
     COPY = True
     COVERAGE = True
@@ -61,7 +61,7 @@ class DeepmindConfigs():
     UNI_LOW_FREQ_THRESHOLD = 10
     NUM_FREQUENT_WORDS = 10000
 
-    PG_DICT_SIZE = 50000 # dic for acl17 paper: pointer network
+    PG_DICT_SIZE = 50000 # dict for acl17 paper: pointer-generator
     
     W_UNK = "<unk>"
     W_BOS = "<bos>"

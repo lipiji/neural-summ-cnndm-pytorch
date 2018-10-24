@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-cudaid = 4
+cudaid = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cudaid)
 
 import sys
@@ -51,7 +51,7 @@ def init_modules():
 
     options = {}
 
-    options["is_debugging"] = True
+    options["is_debugging"] = False
     options["is_predicting"] = False
 
     options["cuda"] = cfg.CUDA and torch.cuda.is_available()
@@ -61,22 +61,22 @@ def init_modules():
     options["cell"] = cfg.CELL
     options["copy"] = cfg.COPY
     options["coverage"] = cfg.COVERAGE
-
+    options["is_bidirectional"] = True
+    options["beam_decoding"] = True # False for greedy decoding
+    
     assert TRAINING_DATASET_CLS.IS_UNICODE == TESTING_DATASET_CLS.IS_UNICODE
     options["is_unicode"] = TRAINING_DATASET_CLS.IS_UNICODE # True Chinese dataet
     options["has_y"] = TRAINING_DATASET_CLS.HAS_Y
     
     options["has_lvt_trick"] = False
     options["has_learnable_w2v"] = True
-    options["is_bidirectional"] = True
-    options["beam_decoding"] = True # False for greedy decoding
     options["omit_eos"] = False # omit <eos> and continuously decode until length of sentence reaches MAX_LEN_PREDICT (for DUC testing data)
     options["prediction_bytes_limitation"] = False if TESTING_DATASET_CLS.MAX_BYTE_PREDICT == None else True
 
     assert options["is_unicode"] == False
 
     consts = {}
-
+    
     consts["idx_gpu"] = cudaid
 
     consts["dim_x"] = cfg.DIM_X
@@ -140,27 +140,57 @@ def greedy_decode(flist, batch, model, modules, consts, options):
     existence = [True] * testing_batch_size
     num_left = testing_batch_size
 
-    word_emb, dec_state, x_mask, y, len_y = batch
-    next_y = torch.LongTensor(np.ones((1, testing_batch_size), dtype="int64")).cuda()
+    if options["copy"]:
+        x, word_emb, dec_state, x_mask, y, len_y, ref_sents, max_ext_len, oovs = batch
+    else:
+        x, word_emb, dec_state, x_mask, y, len_y, ref_sents = batch
 
+    next_y = torch.LongTensor(-np.ones((1, testing_batch_size), dtype="int64")).cuda()
+
+    if options["cell"] == "lstm":
+        dec_state = (dec_state, dec_state)
+    if options["coverage"]:
+        acc_att = Variable(torch.zeros(T.transpose(x, 0, 1).size())).to(options["device"]) # B *len(x)
+     
     for step in xrange(consts["max_len_predict"]):
         if num_left == 0:
             break
-        y_pred, dec_state = model.decode_once(next_y, word_emb, dec_state, x_mask)
+        if options["copy"] and options["coverage"]:
+            y_pred, dec_state, acc_att = model.decode_once(next_y, word_emb, dec_state, x_mask, x, max_ext_len, acc_att)
+        elif options["copy"]:
+            y_pred, dec_state = model.decode_once(next_y, word_emb, dec_state, x_mask, x, max_ext_len)
+        elif options["coverage"]:
+            y_pred, dec_state, acc_att = model.decode_once(next_y, word_emb, dec_state, x_mask, acc_att=acc_att)
+        else:
+            y_pred, dec_state = model.decode_once(next_y, word_emb, dec_state, x_mask)
+
         dict_size = y_pred.shape[-1]
         y_pred = y_pred.view(testing_batch_size, dict_size)
-        dec_state = dec_state.view(testing_batch_size, dec_state.shape[-1])
-        next_y = torch.argmax(y_pred, 1).view((1, testing_batch_size))
+        next_y_ = torch.argmax(y_pred, 1)
+        next_y = []
+        for e in range(testing_batch_size):
+            eid = next_y_[e].item()
+            if eid in modules["i2w"]:
+                next_y.append(eid)
+            else:
+                next_y.append(modules["lfw_emb"]) # unk for copy mechanism
+        next_y = np.array(next_y).reshape((1, testing_batch_size))
+        next_y = torch.LongTensor(next_y).cuda()
+
+        if options["coverage"]:
+            acc_att = acc_att.view(testing_batch_size, acc_att.shape[-1])
+
+        if options["cell"] == "lstm":
+            dec_state = (dec_state[0].view(testing_batch_size, dec_state[0].shape[-1]), dec_state[1].view(testing_batch_size, dec_state[1].shape[-1]))
+        else:
+            dec_state = dec_state.view(testing_batch_size, dec_state.shape[-1])
 
         for idx_doc in xrange(testing_batch_size):
             if existence[idx_doc] == False:
                 continue
 
             idx_max = next_y[0, idx_doc].item()
-            if options["has_lvt_trick"]:
-                idx_max = lvt_i2i[idx_max]
-                next_y[0, idx_doc] = idx_max
-            if idx_max == modules["eos_emb"]:
+            if idx_max == modules["eos_emb"] and len(dec_result[idx_doc]) >= consts["min_len_predict"]:
                 existence[idx_doc] = False
                 num_left -= 1
             else:
@@ -179,14 +209,17 @@ def greedy_decode(flist, batch, model, modules, consts, options):
     for idx_doc in xrange(testing_batch_size):
         fname = str(flist[idx_doc])
         if len(dec_result[idx_doc]) >= consts["min_len_predict"]:
-            write_summ("".join((cfg.cc.SUMM_PATH, fname)), dec_result[idx_doc], 1, options)
-            write_summ("".join((cfg.cc.BEAM_SUMM_PATH, fname)), dec_result[idx_doc], 1, options, modules["i2w"])
-            if options["has_y"]:
-                ly = len_y[idx_doc]
-                y_true = y[0 : ly, idx_doc].tolist()
-                y_true = [str(i) for i in y_true[:-1]] # delete <eos>
-                write_summ("".join((cfg.cc.GROUND_TRUTH_PATH, fname)), y_true, 1, options)
-                write_summ("".join((cfg.cc.BEAM_GT_PATH, fname)), y_true, 1, options, modules["i2w"])
+            dec_words = []
+            for e in dec_result[idx_doc]:
+                e = int(e)
+                if e in modules["i2w"]: # if not copy, the word are all in dict
+                    dec_words.append(modules["i2w"][e])
+                else:
+                    dec_words.append(oovs[e - len(modules["i2w"])])
+            write_for_rouge(fname, ref_sents[idx_doc], dec_words, cfg)
+        else:
+            print "ERROR: " + fname
+
 
 def beam_decode(fname, batch, model, modules, consts, options):
     fname = str(fname)
@@ -201,8 +234,12 @@ def beam_decode(fname, batch, model, modules, consts, options):
     last_scores = torch.FloatTensor(np.zeros(1)).cuda()
     last_states = []
 
-    x, word_emb, dec_state, x_mask, y, len_y, ref_sents, max_ext_len, oovs = batch
-    next_y = torch.LongTensor(-np.ones((1, num_live, 1), dtype="int64")).cuda()
+    if options["copy"]:
+        x, word_emb, dec_state, x_mask, y, len_y, ref_sents, max_ext_len, oovs = batch
+    else:
+        x, word_emb, dec_state, x_mask, y, len_y, ref_sents = batch
+    
+    next_y = torch.LongTensor(-np.ones((1, num_live), dtype="int64")).cuda()
     x = x.unsqueeze(1)
     word_emb = word_emb.unsqueeze(1)
     x_mask = x_mask.unsqueeze(1)
@@ -225,7 +262,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
         elif options["copy"]:
             y_pred, dec_state = model.decode_once(next_y, tile_word_emb, dec_state, tile_x_mask, tile_x, max_ext_len)
         elif options["coverage"]:
-            y_pred, dec_state, acc_att = model.decode_once(next_y, tile_word_emb, dec_state, tile_x_mask, acc_att)
+            y_pred, dec_state, acc_att = model.decode_once(next_y, tile_word_emb, dec_state, tile_x_mask, acc_att=acc_att)
         else:
             y_pred, dec_state = model.decode_once(next_y, tile_word_emb, dec_state, tile_x_mask)
         dict_size = y_pred.shape[-1]
@@ -268,7 +305,6 @@ def beam_decode(fname, batch, model, modules, consts, options):
         last_traces = []
         last_scores = []
         last_states = []
-
         for i in xrange(len(traces_now)):
             if traces_now[i][-1] == modules["eos_emb"] and len(traces_now[i]) >= consts["min_len_predict"]:
                 samples.append([str(e.item()) for e in traces_now[i][:-1]])
@@ -278,7 +314,8 @@ def beam_decode(fname, batch, model, modules, consts, options):
                 last_traces.append(traces_now[i])
                 last_scores.append(scores_now[i])
                 last_states.append(states_now[i])
-                last_acc_att.append(acc_att_now[i])
+                if options["coverage"]:
+                    last_acc_att.append(acc_att_now[i])
                 num_live += 1
         if num_live == 0 or num_dead >= beam_size:
             break
@@ -361,16 +398,18 @@ def beam_decode(fname, batch, model, modules, consts, options):
 
     for e in sorted_samples[-1]:
         e = int(e)
-        if e in modules["i2w"]:
+        if e in modules["i2w"]: # if not copy, the word are all in dict
             dec_words.append(modules["i2w"][e])
         else:
             dec_words.append(oovs[e - len(modules["i2w"])])
-    # for rouge
+    
     write_for_rouge(fname, ref_sents, dec_words, cfg)
 
-    # beam search history
-    write_summ_copy("".join((cfg.cc.BEAM_SUMM_PATH, fname)), sorted_samples, num_samples, options, modules["i2w"], oovs, sorted_scores)
-    write_summ_copy("".join((cfg.cc.BEAM_GT_PATH, fname)), y_true, 1, options, modules["i2w"], oovs)
+    # beam search history for checking
+    if not options["copy"]:
+        oovs = None
+    write_summ("".join((cfg.cc.BEAM_SUMM_PATH, fname)), sorted_samples, num_samples, options, modules["i2w"], oovs, sorted_scores)
+    write_summ("".join((cfg.cc.BEAM_GT_PATH, fname)), y_true, 1, options, modules["i2w"], oovs) 
 
 
 def predict(model, modules, consts, options):
@@ -399,6 +438,8 @@ def predict(model, modules, consts, options):
         test_idx = batch_list[idx_batch]
         batch_raw = [xy_list[xy_idx] for xy_idx in test_idx]
         batch = datar.get_data(batch_raw, modules, consts, options)
+        
+        assert len(test_idx) == batch.x.shape[1] # local_batch_size
 
         x, len_x, x_mask, y, len_y, y_mask, oy, x_ext, y_ext, oovs = sort_samples(batch.x, batch.len_x, \
                                                              batch.x_mask, batch.y, batch.len_y, batch.y_mask, \
@@ -407,15 +448,25 @@ def predict(model, modules, consts, options):
         word_emb, dec_state = model.encode(torch.LongTensor(x).cuda(), torch.LongTensor(len_x).cuda(), torch.FloatTensor(x_mask).cuda())
 
         if options["beam_decoding"]:
-            for idx_s in xrange(word_emb.size(1)):
-                inputx = (torch.LongTensor(x_ext[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
+            for idx_s in xrange(len(test_idx)):
+                if options["copy"]:
+                    inputx = (torch.LongTensor(x_ext[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
                           torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s],\
                           batch.max_ext_len, oovs[idx_s])
-                beam_decode_copy(si, inputx, model, modules, consts, options)
+                else:
+                    inputx = (torch.LongTensor(x[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
+                          torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s])
+
+                beam_decode(si, inputx, model, modules, consts, options)
                 si += 1
         else:
-            inputx = (word_emb, dec_state, torch.FloatTensor(x_mask).cuda(), y, len_y)
+            if options["copy"]:
+                inputx = (torch.LongTensor(x_ext).cuda(), word_emb, dec_state, \
+                          torch.FloatTensor(x_mask).cuda(), y, len_y, oy, batch.max_ext_len, oovs)
+            else:
+                inputx = (torch.LongTensor(x).cuda(), word_emb, dec_state, torch.FloatTensor(x_mask).cuda(), y, len_y, oy)
             greedy_decode(test_idx, inputx, model, modules, consts, options)
+            si += len(test_idx)
 
         testing_batch_size = len(test_idx)
         partial_num += testing_batch_size
@@ -464,7 +515,7 @@ def run(existing_model_name = None):
         existing_epoch = 0
         if need_load_model:
             if existing_model_name == None:
-                existing_model_name = "cnndm.s2sfinal.gpu4.epoch149.1"
+                existing_model_name = "cnndm.s2s.gpu6.epoch7.2"
             print "loading existed model:", existing_model_name
             model, optimizer = load_model(cfg.cc.MODEL_PATH + existing_model_name, model, optimizer)
 
@@ -475,13 +526,12 @@ def run(existing_model_name = None):
             last_total_error = float("inf")
             print "max epoch:", consts["max_epoch"]
             for epoch in xrange(0, consts["max_epoch"]):
-                '''
                 if not options["is_debugging"] and epoch == 5:
                     consts["lr"] *= 0.1
                     #adjust
                     for param_group in optimizer.param_groups:
                         param_group['lr'] = consts["lr"]
-                '''
+                
                 print "epoch: ", epoch + existing_epoch
                 num_partial = 1
                 total_error = 0.0

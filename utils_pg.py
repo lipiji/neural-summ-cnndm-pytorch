@@ -159,50 +159,7 @@ def write_for_rouge(fname, ref_sents, dec_words, cfg):
             sent = sent.strip()
             f.write(sent) if idx == len(dec_sents) - 1 else f.write(sent + "\n")
 
-def write_summ(dst_path, summ_list, num_summ, options, i2w = None, score_list = None):
-    is_unicode = options["is_unicode"]
-    assert num_summ > 0
-    with open(dst_path, "w") as f_summ:
-        if num_summ == 1:
-            if score_list != None:
-                f_summ.write(str(score_list[0]))
-                f_summ.write("\t")
-            if i2w != None:
-                #for e in summ_list:
-                #    print i2w[int(e)],
-                #print "\n"
-                if is_unicode:
-                    s = "".join([i2w[int(e)] for e in summ_list]).encode("utf-8")
-                else:
-                    s = " ".join([i2w[int(e)] for e in summ_list])
-            else:
-                s = " ".join(summ_list)
-            f_summ.write(s)
-            f_summ.write("\n")
-        else:
-            assert num_summ == len(summ_list)
-            if score_list != None:
-                assert num_summ == len(score_list)
-
-            for i in xrange(num_summ):
-                if score_list != None:
-                    f_summ.write(str(score_list[i]))
-                    f_summ.write("\t")
-                if i2w != None:
-                    #for e in summ_list[i]:
-                    #    print i2w[int(e)],
-                    #print "\n"
-                    if is_unicode:
-                        s = "".join([i2w[int(e)] for e in summ_list[i]]).encode("utf-8")
-                    else:
-                        s = " ".join([i2w[int(e)] for e in summ_list[i]])
-                else:
-                    s = " ".join(summ_list[i])
-
-                f_summ.write(s)
-                f_summ.write("\n")
-
-def write_summ_copy(dst_path, summ_list, num_summ, options, i2w = None, oovs=None, score_list = None):
+def write_summ(dst_path, summ_list, num_summ, options, i2w = None, oovs=None, score_list = None):
     assert num_summ > 0
     with open(dst_path, "w") as f_summ:
         if num_summ == 1:
@@ -263,6 +220,5 @@ def write_summ_copy(dst_path, summ_list, num_summ, options, i2w = None, oovs=Non
 
                 f_summ.write(s)
                 f_summ.write("\n")
-
 
 
