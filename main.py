@@ -196,15 +196,24 @@ def greedy_decode(flist, batch, model, modules, consts, options):
                 num_left -= 1
             else:
                 dec_result[idx_doc].append(str(idx_max))
-
+    
+    # for task with bytes-length limitation 
     if options["prediction_bytes_limitation"]:
         for i in xrange(len(dec_result)):
             sample = dec_result[i]
             b = 0
             for j in xrange(len(sample)):
-                b += len(sample[j])
+                e = int(sample[j]) 
+                if e in modules["i2w"]:
+                    word = modules["i2w"][e]
+                else:
+                    word = oovs[e - len(modules["i2w"])]
+                if j == 0:
+                    b += len(word)
+                else:
+                    b += len(word) + 1 
                 if b > consts["max_byte_predict"]:
-                    dec_result[i] = dec_result[i][0 : j]
+                    sorted_samples[i] = sorted_samples[i][0 : j]
                     break
 
     for idx_doc in xrange(testing_batch_size):
@@ -387,10 +396,15 @@ def beam_decode(fname, batch, model, modules, consts, options):
             sample = sorted_samples[i]
             b = 0
             for j in xrange(len(sample)):
-                if j == 0:
-                    b += len(modules["i2w"][int(sample[j])])
+                e = int(sample[j]) 
+                if e in modules["i2w"]:
+                    word = modules["i2w"][e]
                 else:
-                    b += len(modules["i2w"][int(sample[j])]) + 1 
+                    word = oovs[e - len(modules["i2w"])]
+                if j == 0:
+                    b += len(word)
+                else:
+                    b += len(word) + 1 
                 if b > consts["max_byte_predict"]:
                     sorted_samples[i] = sorted_samples[i][0 : j]
                     break
