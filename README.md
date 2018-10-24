@@ -1,4 +1,18 @@
-# neural-summ-cnndm-pytorch
-- Summarization on the dataset of CNN-DailyMail
-- Try to move the code from theano to pytorch
-- Try to reproduce the results of pointer-generator (copy + coverage)
+## Abstractive Summarization on CNN-DailyMail
+
+### Results
+#### Model-1: attention-seq2seq
+
+#### Model-2: attention-seq2seq + copy
+
+#### Model-3: attention-seq2seq + coverage
+
+#### Model-4: attention-seq2seq + copy + coverage
+
+### How to run:
+- Download dataset from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
+- Run python prepare_data.py
+- Training: python main.py | tee train.log
+- Tuning: modify main.py: is_predicting=true and model_selection=true, then run "bash tuning_deepmind.sh | tee tune.log"
+- Testing: modify main.py: is_predicting=true and model_selection=false, then run "python main.py you-best-model (say cnndm.s2s.gpu4.epoch7.1)"
+- The Perl Rouge package is enough, I did not use pyrouge.
