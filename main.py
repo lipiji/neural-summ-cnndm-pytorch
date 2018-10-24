@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-cudaid = 5
+cudaid = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = str(cudaid)
 
 import sys
@@ -587,7 +587,7 @@ def run(existing_model_name = None):
                         error_c += cost_c
                     
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
                     optimizer.step()
                     
                     cost = cost.item()
