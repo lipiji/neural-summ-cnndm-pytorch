@@ -10,7 +10,7 @@
 #### Model-4: attention-seq2seq + copy + coverage
 
 ### How to run:
-- Download dataset from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
+- Download FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
 - Run python prepare_data.py
 - Training: python main.py | tee train.log
 - Tuning: modify main.py: is_predicting=true and model_selection=true, then run "bash tuning_deepmind.sh | tee tune.log"
