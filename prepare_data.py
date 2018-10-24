@@ -240,7 +240,7 @@ def prepare_deepmind(d_path):
 
     print "dump validate..."
     pickle.dump(valid_xy_list, open(VALIDATE_PATH + "valid.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
-    
+    pickle.dump(valid_xy_list[0:1000], open(VALIDATE_PATH + "pj1000.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     
     print "done."
 

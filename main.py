@@ -53,6 +53,7 @@ def init_modules():
 
     options["is_debugging"] = False
     options["is_predicting"] = False
+    options["model_selection"] = False # When options["is_predicting"] = True, true means use validation set for tuning, false is real testing.
 
     options["cuda"] = cfg.CUDA and torch.cuda.is_available()
     options["device"] = torch.device("cuda" if  options["cuda"] else "cpu")
@@ -425,7 +426,10 @@ def predict(model, modules, consts, options):
     rebuild_dir(cfg.cc.SUMM_PATH)
 
     print "loading test set..."
-    xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "pj2000.pkl", "r")) 
+    if options["model_selection"]:
+        xy_list = pickle.load(open(cfg.cc.VALIDATE_DATA_PATH + "pj1000.pkl", "r")) 
+    else:
+        xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "test.pkl", "r")) 
     batch_list, num_files, num_batches = datar.batched(len(xy_list), options, consts)
 
     print "num_files = ", num_files, ", num_batches = ", num_batches
@@ -515,7 +519,7 @@ def run(existing_model_name = None):
         existing_epoch = 0
         if need_load_model:
             if existing_model_name == None:
-                existing_model_name = "cnndm.s2s.gpu6.epoch7.2"
+                existing_model_name = "cnndm.s2s.gpu4.epoch7.1"
             print "loading existed model:", existing_model_name
             model, optimizer = load_model(cfg.cc.MODEL_PATH + existing_model_name, model, optimizer)
 
