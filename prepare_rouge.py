@@ -57,4 +57,4 @@ for file_id, fsumm in i2summ.items():
 rouge_s += "\n</ROUGE-EVAL>"
 
 with open(ROUGE_PATH + "myROUGE_Config.xml", "w") as f_rouge:
-    f_rouge.write(rouge_s)
+    f_rouge.write(rouge_s) 
