@@ -365,7 +365,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
     #weight by length
     for i in xrange(len(sample_scores)):
         sent_len = float(len(samples[i]))
-        sample_scores[i] = sample_scores[i] #*  math.exp(-sent_len / 10)
+        sample_scores[i] = sample_scores[i] / sent_len #avg is better than sum.   #*  math.exp(-sent_len / 10)
 
     idx_sorted_scores = np.argsort(sample_scores) # ascending order
     if options["has_y"]:
