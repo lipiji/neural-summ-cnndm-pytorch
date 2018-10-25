@@ -20,6 +20,10 @@ class LSTMAttentionDecoder(nn.Module):
         
         self.lstm_1 = nn.LSTMCell(self.input_size, self.hidden_size)
 
+        self.Wx = nn.Parameter(torch.Tensor(4 * self.hidden_size, self.ctx_size))
+        self.Ux = nn.Parameter(torch.Tensor(4 * self.hidden_size, self.hidden_size))
+        self.bx = nn.Parameter(torch.Tensor(4 * self.hidden_size))
+
         self.Wc_att = nn.Parameter(torch.Tensor(self.ctx_size, self.ctx_size))
         self.b_att = nn.Parameter(torch.Tensor(self.ctx_size))
 
@@ -33,6 +37,9 @@ class LSTMAttentionDecoder(nn.Module):
 
     def init_weights(self):
         init_lstm_weight(self.lstm_1)
+        init_ortho_weight(self.Wx)
+        init_ortho_weight(self.Ux)
+        init_bias(self.bx)
         init_ortho_weight(self.Wc_att)
         init_bias(self.b_att)
         init_ortho_weight(self.W_comb_att)
@@ -42,7 +49,7 @@ class LSTMAttentionDecoder(nn.Module):
 
 
     def forward(self, y_emb, context, init_state, x_mask, y_mask, xid=None, init_coverage=None):
-        def _get_word_atten(pctx, h1, x_mask, acc_att=None): #acc_att: B * len(B)
+        def _get_word_atten(pctx, h1, x_mask, acc_att=None): #acc_att: B * len(x)
             if acc_att is not None:
                 h = F.linear(h1, self.W_comb_att) + F.linear(T.transpose(acc_att, 0, 1).unsqueeze(2), self.W_coverage) # len(x) * B * ?
             else:
@@ -70,14 +77,23 @@ class LSTMAttentionDecoder(nn.Module):
                 word_atten = _get_word_atten(pctx, s, x_mask)
             atted_ctx = T.sum(word_atten * context, 0)
 
+            ifoc_preact1 = F.linear(h1, self.Ux) + F.linear(atted_ctx, self.Wx, self.bx)
+            x4i1, x4f1, x4o1, x4c1 = ifoc_preact1.chunk(4, 1)
+            i1 = torch.sigmoid(x4i1)
+            f1 = torch.sigmoid(x4f1)
+            o1 = torch.sigmoid(x4o1)
+            c2 = f1 * c1 + i1 * torch.tanh(x4c1)
+            h2 = o1 * torch.tanh(c2)
+            c2 = y_mask * c2 + (1.0 - y_mask) * c1
+            h2 = y_mask * h2 + (1.0 - y_mask) * h1
 
             word_atten_ = T.transpose(word_atten.view(x_mask.size(0), -1), 0, 1)
             
             if self.coverage:
                 acc_att += word_atten_
-                return (h1, c1), h1, atted_ctx, word_atten_, acc_att
+                return (h2, c2), h2, atted_ctx, word_atten_, acc_att
             else:
-                return (h1, c1), h1, atted_ctx, word_atten_
+                return (h2, c2), h2, atted_ctx, word_atten_
 
         hs = []
         cs = []
