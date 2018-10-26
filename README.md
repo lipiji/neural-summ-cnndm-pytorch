@@ -5,6 +5,7 @@
 
 #### Model-2: attention-seq2seq + copy
 ##### GRU （NLL loss + norm-clip=5）:
+```
 C ROUGE-1 Average_R: 0.43722 (95%-conf.int. 0.43441 - 0.43994)</br>
 C ROUGE-1 Average_P: 0.33340 (95%-conf.int. 0.33090 - 0.33587)</br>
 C ROUGE-1 Average_F: 0.36604 (95%-conf.int. 0.36376 - 0.36829)</br>
@@ -20,10 +21,11 @@ C ROUGE-L Average_F: 0.33105 (95%-conf.int. 0.32886 - 0.33341)</br>
 C ROUGE-SU4 Average_R: 0.19460 (95%-conf.int. 0.19234 - 0.19681)</br>
 C ROUGE-SU4 Average_P: 0.14813 (95%-conf.int. 0.14624 - 0.15019)</br>
 C ROUGE-SU4 Average_F: 0.16220 (95%-conf.int. 0.16028 - 0.16405)</br>
-
+```
 #### Model-3: attention-seq2seq + coverage
 
 ##### GRU （NLL loss + norm-clip=5）:
+```
 C ROUGE-1 Average_R: 0.38197 (95%-conf.int. 0.37955 - 0.38433)</br>
 C ROUGE-1 Average_P: 0.36479 (95%-conf.int. 0.36235 - 0.36742)</br>
 C ROUGE-1 Average_F: 0.36002 (95%-conf.int. 0.35802 - 0.36230)</br>
@@ -39,9 +41,11 @@ C ROUGE-L Average_F: 0.33113 (95%-conf.int. 0.32923 - 0.33335)</br>
 C ROUGE-SU4 Average_R: 0.16692 (95%-conf.int. 0.16490 - 0.16894)</br>
 C ROUGE-SU4 Average_P: 0.16021 (95%-conf.int. 0.15818 - 0.16222)</br>
 C ROUGE-SU4 Average_F: 0.15709 (95%-conf.int. 0.15528 - 0.15892)</br>
-
+```
 #### Model-4: attention-seq2seq + copy + coverage
+
 ##### GRU （NLL loss + norm-clip=5）:
+```
 C ROUGE-1 Average_R: 0.44517 (95%-conf.int. 0.44225 - 0.44785)</br>
 C ROUGE-1 Average_P: 0.37019 (95%-conf.int. 0.36757 - 0.37286)</br>
 C ROUGE-1 Average_F: 0.39081 (95%-conf.int. 0.38862 - 0.39309)</br>
@@ -57,8 +61,9 @@ C ROUGE-L Average_F: 0.35930 (95%-conf.int. 0.35708 - 0.36152)</br>
 C ROUGE-SU4 Average_R: 0.20330 (95%-conf.int. 0.20083 - 0.20567)</br>
 C ROUGE-SU4 Average_P: 0.16916 (95%-conf.int. 0.16704 - 0.17141)</br>
 C ROUGE-SU4 Average_F: 0.17787 (95%-conf.int. 0.17579 - 0.18000)</br>
-
+```
 ##### GRU （avg NLL loss + norm-clip=2）：
+```
 C ROUGE-1 Average_R: 0.46080 (95%-conf.int. 0.45828 - 0.46352)</br>
 C ROUGE-1 Average_P: 0.37468 (95%-conf.int. 0.37218 - 0.37748)</br>
 C ROUGE-1 Average_F: 0.39739 (95%-conf.int. 0.39519 - 0.39968)</br>
@@ -74,7 +79,7 @@ C ROUGE-L Average_F: 0.36089 (95%-conf.int. 0.35869 - 0.36331)</br>
 C ROUGE-SU4 Average_R: 0.20868 (95%-conf.int. 0.20651 - 0.21080)</br>
 C ROUGE-SU4 Average_P: 0.16992 (95%-conf.int. 0.16774 - 0.17214)</br>
 C ROUGE-SU4 Average_F: 0.17928 (95%-conf.int. 0.17719 - 0.18128)</br>
-
+```
 
 ### How to run:
 - Download FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
