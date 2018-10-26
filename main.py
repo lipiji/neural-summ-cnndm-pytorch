@@ -32,16 +32,19 @@ def print_basic_info(modules, consts, options):
         print "USE COPY MECHANISM"
     if options["coverage"]:
         print "USE COVERAGE MECHANISM"
+    if  options["avg_nll"]:
+        print "USE AVG NLL as LOSS"
+    else:
+        print "USE NLL as LOSS"
     if options["has_learnable_w2v"]:
         print "USE LEARNABLE W2V EMBEDDING"
     if options["is_bidirectional"]:
         print "USE BI-DIRECTIONAL RNN"
-    if options["has_lvt_trick"]:
-        print "USE LVT TRICK"
     if options["omit_eos"]:
         print "<eos> IS OMITTED IN TESTING DATA"
     if options["prediction_bytes_limitation"]:
         print "MAXIMUM BYTES IN PREDICTION IS LIMITED"
+    print "RNN TYPE: " + options["cell"]
     for k in consts:
         print k + ":", consts[k]
 
@@ -62,14 +65,15 @@ def init_modules():
     options["cell"] = cfg.CELL
     options["copy"] = cfg.COPY
     options["coverage"] = cfg.COVERAGE
-    options["is_bidirectional"] = True
+    options["is_bidirectional"] = cfg.BI_RNN
+    options["avg_nll"] = cfg.AVG_NLL
+
     options["beam_decoding"] = True # False for greedy decoding
     
     assert TRAINING_DATASET_CLS.IS_UNICODE == TESTING_DATASET_CLS.IS_UNICODE
     options["is_unicode"] = TRAINING_DATASET_CLS.IS_UNICODE # True Chinese dataet
     options["has_y"] = TRAINING_DATASET_CLS.HAS_Y
     
-    options["has_lvt_trick"] = False
     options["has_learnable_w2v"] = True
     options["omit_eos"] = False # omit <eos> and continuously decode until length of sentence reaches MAX_LEN_PREDICT (for DUC testing data)
     options["prediction_bytes_limitation"] = False if TESTING_DATASET_CLS.MAX_BYTE_PREDICT == None else True
@@ -80,6 +84,7 @@ def init_modules():
     
     consts["idx_gpu"] = cudaid
 
+    consts["norm_clip"] = cfg.NORM_CLIP
     consts["dim_x"] = cfg.DIM_X
     consts["dim_y"] = cfg.DIM_Y
     consts["len_x"] = cfg.MAX_LEN_X + 1 # plus 1 for eos
@@ -87,8 +92,6 @@ def init_modules():
     consts["num_x"] = cfg.MAX_NUM_X
     consts["num_y"] = cfg.NUM_Y
     consts["hidden_size"] = cfg.HIDDEN_SIZE
-
-    consts["lvt_dict_size"] = 200 if options["is_debugging"] else cfg.LVT_DICT_SIZE
 
     consts["batch_size"] = 5 if options["is_debugging"] else TRAINING_DATASET_CLS.BATCH_SIZE
     if options["is_debugging"]:
@@ -102,22 +105,15 @@ def init_modules():
     consts["max_byte_predict"] = TESTING_DATASET_CLS.MAX_BYTE_PREDICT
     consts["testing_print_size"] = TESTING_DATASET_CLS.PRINT_SIZE
 
-    consts["top_k"] = 1
     consts["lr"] = 0.15
     consts["beam_size"] = 4
 
     consts["max_epoch"] = 150 if options["is_debugging"] else 30 
-    consts["num_model"] = 1
     consts["print_time"] = 5
     consts["save_epoch"] = 1
 
     assert consts["dim_x"] == consts["dim_y"]
-    assert consts["top_k"] <= cfg.MIN_NUM_X
     assert consts["beam_size"] >= 1
-    if options["has_lvt_trick"]:
-        assert consts["lvt_dict_size"] != None
-        assert consts["testing_batch_size"] <= consts["batch_size"]
-        assert consts["lvt_dict_size"] <= cfg.NUM_FREQUENT_WORDS
 
     modules = {}
     
@@ -126,8 +122,6 @@ def init_modules():
     modules["dic"] = dic
     modules["w2i"] = w2i
     modules["i2w"] = i2w
-    if options["has_lvt_trick"]:
-        modules["freq_words"] = hfw
     modules["lfw_emb"] = modules["w2i"][cfg.W_UNK]
     modules["eos_emb"] = modules["w2i"][cfg.W_EOS]
     consts["pad_token_idx"] = modules["w2i"][cfg.W_PAD]
@@ -522,14 +516,11 @@ def run(existing_model_name = None):
     if True: #TODO: refactor
         print "compiling model ..." 
         model = Model(modules, consts, options)
-        #criterion = nn.NLLLoss(ignore_index=consts["pad_token_idx"])
         if options["cuda"]:
             model.cuda()
-            #criterion.cuda()
-            #model = nn.DataParallel(model)
         optimizer = torch.optim.Adagrad(model.parameters(), lr=consts["lr"], initial_accumulator_value=0.1)
         
-        model_name = "cnndm.s2s"
+        model_name = "".join(["cnndm.s2s.", options["cell"]])
         existing_epoch = 0
         if need_load_model:
             if existing_model_name == None:
@@ -544,14 +535,6 @@ def run(existing_model_name = None):
             last_total_error = float("inf")
             print "max epoch:", consts["max_epoch"]
             for epoch in xrange(0, consts["max_epoch"]):
-                '''
-                if not options["is_debugging"] and epoch == 5:
-                    consts["lr"] *= 0.1
-                    #adjust
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = consts["lr"]
-                '''
-
                 print "epoch: ", epoch + existing_epoch
                 num_partial = 1
                 total_error = 0.0
@@ -587,7 +570,7 @@ def run(existing_model_name = None):
                         error_c += cost_c
                     
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), consts["norm_clip"])
                     optimizer.step()
                     
                     cost = cost.item()
@@ -622,7 +605,7 @@ def run(existing_model_name = None):
                     break
 
             print "save final model... ",
-            save_model(cfg.cc.MODEL_PATH + model_name + "final.gpu" + str(consts["idx_gpu"]) + ".epoch" + str(epoch / consts["save_epoch"] + existing_epoch) + "." + str(num_partial), model, optimizer)
+            save_model(cfg.cc.MODEL_PATH + model_name + ".final.gpu" + str(consts["idx_gpu"]) + ".epoch" + str(epoch / consts["save_epoch"] + existing_epoch) + "." + str(num_partial), model, optimizer)
             print "finished"
         else:
             print "skip training model"

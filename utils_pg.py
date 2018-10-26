@@ -92,7 +92,7 @@ def sort_samples(x, len_x, mask_x, y, len_y, \
            sorted_y_len, sorted_y_mask, sorted_oys, \
            sorted_x_ext, sorted_y_ext, sorted_oovs
 
-def print_sent_dec(y_pred, y, y_mask, oovs, modules, consts, options, batch_size, lvt_dict = None):
+def print_sent_dec(y_pred, y, y_mask, oovs, modules, consts, options, batch_size):
     print "golden truth and prediction samples:"
     max_y_words = np.sum(y_mask, axis = 0)
     max_y_words = max_y_words.reshape((batch_size))
@@ -120,8 +120,6 @@ def print_sent_dec(y_pred, y, y_mask, oovs, modules, consts, options, batch_size
         sent_pred = ""
         for idx_word in range(max_y_words[idx_doc]):
             i = torch.argmax(y_pred[idx_word, idx_doc, :]).item()
-            if options["has_lvt_trick"]:
-                i = lvt_dict[i]
             if i in modules["i2w"]:
                 sent_pred += modules["i2w"][i]
             else:

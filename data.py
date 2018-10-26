@@ -11,14 +11,11 @@ from random import shuffle
 
 class BatchData:
     def __init__(self, flist, modules, consts, options):
-        is_lvt = options["has_lvt_trick"]
         self.batch_size = len(flist) 
         self.x = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64)
         self.x_ext = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64)
         self.y = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64)
         self.y_ext = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64)
-        self.x_lvt = np.zeros((consts["len_x"], self.batch_size), dtype = np.int64) if is_lvt else None
-        self.y_lvt = np.zeros((consts["len_y"], self.batch_size), dtype = np.int64) if is_lvt else None
         self.x_mask = np.zeros((consts["len_x"], self.batch_size, 1), dtype = np.int64)
         self.y_mask = np.zeros((consts["len_y"], self.batch_size, 1), dtype = np.int64)
         self.len_x = []
@@ -31,13 +28,6 @@ class BatchData:
         w2i = modules["w2i"]
         i2w = modules["i2w"]
         dict_size = len(w2i)
-        
-        if is_lvt:
-            hfw = modules["freq_words"]
-            lvt_dict_size = consts["lvt_dict_size"]
-            lvt_w2i = {}
-            lvt_i2i = {}
-            lvt_dict = []
 
         for idx_doc in xrange(len(flist)):
             if len(flist[idx_doc]) == 2:
@@ -100,51 +90,6 @@ class BatchData:
         self.y = self.y[0:max_len_y, :]
         self.y_ext = self.y_ext[0:max_len_y, :]
         self.y_mask = self.y_mask[0:max_len_y, :, :]
-
-
-        if not is_lvt:
-            return
-       
-        # use lvt for duc dataset to remove eos!!!
-        if options["omit_eos"]:
-            if len(lvt_dict) > lvt_dict_size:
-                print "len(lvt_dict) > lvt_dict_size", len(lvt_dict), lvt_dict_size
-            if len(lvt_dict) < lvt_dict_size:
-                for w in hfw:
-                    if w not in lvt_w2i and w != i2w[modules["eos_emb"]]:
-                        lvt_w2i[w] = len(lvt_dict)
-                        lvt_dict.append(w2i[w])
-                    if len(lvt_dict) == lvt_dict_size:
-                        break
-
-            assert len(lvt_w2i) == lvt_dict_size
-            assert len(lvt_dict) == lvt_dict_size
-            for i in xrange(lvt_dict_size):
-                lvt_i2i[i] = lvt_dict[i]
-
-        else:
-            # process lvt dict
-            if len(lvt_dict) > lvt_dict_size:
-                print "len(lvt_dict) > lvt_dict_size", len(lvt_dict), lvt_dict_size
-            if len(lvt_dict) < lvt_dict_size:
-                for w in hfw:
-                    if w not in lvt_w2i:
-                        lvt_w2i[w] = len(lvt_dict)
-                        lvt_dict.append(w2i[w])
-                    if len(lvt_dict) == lvt_dict_size:
-                        break
-
-            assert len(lvt_w2i) == lvt_dict_size
-            assert len(lvt_dict) == lvt_dict_size
-            for i in xrange(lvt_dict_size):
-                lvt_i2i[i] = lvt_dict[i]
-
-        self.lvt_dict = lvt_dict
-        self.lvt_w2i = lvt_w2i
-        self.lvt_i2i = lvt_i2i
-
-        self.x_lvt = self.x_lvt[0:max_len_x, :]
-        self.y_lvt = self.y_lvt[0:max_len_y, :]
 
 def get_data(xy_list, modules, consts, options):
     return BatchData(xy_list,  modules, consts, options)

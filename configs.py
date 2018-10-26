@@ -41,6 +41,12 @@ class DeepmindConfigs():
     CUDA = True
     COPY = True
     COVERAGE = True
+    BI_RNN = True 
+    AVG_NLL = True
+    NORM_CLIP = 2
+    if not AVG_NLL:
+        NORM_CLIP = 5
+        
 
     DIM_X = 128
     DIM_Y = DIM_X
@@ -55,11 +61,8 @@ class DeepmindConfigs():
 
     NUM_Y = 1
     HIDDEN_SIZE = 256
-    LATENT_SIZE = 500
-    LVT_DICT_SIZE = 10000
 
     UNI_LOW_FREQ_THRESHOLD = 10
-    NUM_FREQUENT_WORDS = 10000
 
     PG_DICT_SIZE = 50000 # dict for acl17 paper: pointer-generator
     
