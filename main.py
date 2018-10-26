@@ -512,7 +512,7 @@ def run(existing_model_name = None):
     if training_model:
         print "loading train set..."
         if options["is_debugging"]:
-            xy_list = pickle.load(open(cfg.cc.TESTING_DATA_PATH + "test.pkl", "r")) 
+            xy_list = pickle.load(open(cfg.cc.VALIDATE_DATA_PATH + "pj1000.pkl", "r")) 
         else:
             xy_list = pickle.load(open(cfg.cc.TRAINING_DATA_PATH + "train.pkl", "r")) 
         batch_list, num_files, num_batches = datar.batched(len(xy_list), options, consts)
