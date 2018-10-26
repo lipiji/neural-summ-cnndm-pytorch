@@ -27,7 +27,7 @@ C ROUGE-SU4 Average_F: 0.16220 (95%-conf.int. 0.16028 - 0.16405)</br>
 C ROUGE-1 Average_R: 0.38197 (95%-conf.int. 0.37955 - 0.38433)</br>
 C ROUGE-1 Average_P: 0.36479 (95%-conf.int. 0.36235 - 0.36742)</br>
 C ROUGE-1 Average_F: 0.36002 (95%-conf.int. 0.35802 - 0.36230)</br>
----------------------------------------------
+
 C ROUGE-2 Average_R: 0.15487 (95%-conf.int. 0.15277 - 0.15708)</br>
 C ROUGE-2 Average_P: 0.14912 (95%-conf.int. 0.14701 - 0.15130)</br>
 C ROUGE-2 Average_F: 0.14638 (95%-conf.int. 0.14440 - 0.14846)</br>
