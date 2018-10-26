@@ -23,6 +23,23 @@ C ROUGE-SU4 Average_F: 0.16220 (95%-conf.int. 0.16028 - 0.16405)</br>
 
 #### Model-3: attention-seq2seq + coverage
 
+#### GRU:
+C ROUGE-1 Average_R: 0.38197 (95%-conf.int. 0.37955 - 0.38433)</br>
+C ROUGE-1 Average_P: 0.36479 (95%-conf.int. 0.36235 - 0.36742)</br>
+C ROUGE-1 Average_F: 0.36002 (95%-conf.int. 0.35802 - 0.36230)</br>
+---------------------------------------------
+C ROUGE-2 Average_R: 0.15487 (95%-conf.int. 0.15277 - 0.15708)</br>
+C ROUGE-2 Average_P: 0.14912 (95%-conf.int. 0.14701 - 0.15130)</br>
+C ROUGE-2 Average_F: 0.14638 (95%-conf.int. 0.14440 - 0.14846)</br>
+
+C ROUGE-L Average_R: 0.35101 (95%-conf.int. 0.34873 - 0.35333)</br>
+C ROUGE-L Average_P: 0.33577 (95%-conf.int. 0.33346 - 0.33824)</br>
+C ROUGE-L Average_F: 0.33113 (95%-conf.int. 0.32923 - 0.33335)</br>
+
+C ROUGE-SU4 Average_R: 0.16692 (95%-conf.int. 0.16490 - 0.16894)</br>
+C ROUGE-SU4 Average_P: 0.16021 (95%-conf.int. 0.15818 - 0.16222)</br>
+C ROUGE-SU4 Average_F: 0.15709 (95%-conf.int. 0.15528 - 0.15892)</br>
+
 #### Model-4: attention-seq2seq + copy + coverage
 ##### GRU:
 C ROUGE-1 Average_R: 0.44517 (95%-conf.int. 0.44225 - 0.44785)</br>
