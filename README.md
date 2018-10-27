@@ -64,21 +64,21 @@ C ROUGE-SU4 Average_F: 0.17787 (95%-conf.int. 0.17579 - 0.18000)
 ```
 ##### GRU （avg NLL loss + norm-clip=2）：
 ```
-C ROUGE-1 Average_R: 0.46080 (95%-conf.int. 0.45828 - 0.46352)
-C ROUGE-1 Average_P: 0.37468 (95%-conf.int. 0.37218 - 0.37748)
-C ROUGE-1 Average_F: 0.39739 (95%-conf.int. 0.39519 - 0.39968)
+C ROUGE-1 Average_R: 0.46082 (95%-conf.int. 0.45804 - 0.46365)
+C ROUGE-1 Average_P: 0.37176 (95%-conf.int. 0.36919 - 0.37447)
+C ROUGE-1 Average_F: 0.39686 (95%-conf.int. 0.39461 - 0.39909)
 
-C ROUGE-2 Average_R: 0.20124 (95%-conf.int. 0.19877 - 0.20371)
-C ROUGE-2 Average_P: 0.16484 (95%-conf.int. 0.16236 - 0.16718)
-C ROUGE-2 Average_F: 0.17391 (95%-conf.int. 0.17158 - 0.17612)
+C ROUGE-2 Average_R: 0.20237 (95%-conf.int. 0.19977 - 0.20520)
+C ROUGE-2 Average_P: 0.16415 (95%-conf.int. 0.16175 - 0.16654)
+C ROUGE-2 Average_F: 0.17448 (95%-conf.int. 0.17225 - 0.17683)
 
-C ROUGE-L Average_R: 0.41827 (95%-conf.int. 0.41577 - 0.42091)
-C ROUGE-L Average_P: 0.34040 (95%-conf.int. 0.33784 - 0.34313)
-C ROUGE-L Average_F: 0.36089 (95%-conf.int. 0.35869 - 0.36331)
+C ROUGE-L Average_R: 0.42083 (95%-conf.int. 0.41817 - 0.42347)
+C ROUGE-L Average_P: 0.33970 (95%-conf.int. 0.33722 - 0.34230)
+C ROUGE-L Average_F: 0.36250 (95%-conf.int. 0.36024 - 0.36468)
 
-C ROUGE-SU4 Average_R: 0.20868 (95%-conf.int. 0.20651 - 0.21080)
-C ROUGE-SU4 Average_P: 0.16992 (95%-conf.int. 0.16774 - 0.17214)
-C ROUGE-SU4 Average_F: 0.17928 (95%-conf.int. 0.17719 - 0.18128)
+C ROUGE-SU4 Average_R: 0.21030 (95%-conf.int. 0.20801 - 0.21277)
+C ROUGE-SU4 Average_P: 0.16956 (95%-conf.int. 0.16745 - 0.17182)
+C ROUGE-SU4 Average_F: 0.18028 (95%-conf.int. 0.17835 - 0.18236)
 ```
 
 ### How to run:
