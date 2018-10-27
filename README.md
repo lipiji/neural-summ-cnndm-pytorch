@@ -80,6 +80,24 @@ C ROUGE-SU4 Average_R: 0.21030 (95%-conf.int. 0.20801 - 0.21277)
 C ROUGE-SU4 Average_P: 0.16956 (95%-conf.int. 0.16745 - 0.17182)
 C ROUGE-SU4 Average_F: 0.18028 (95%-conf.int. 0.17835 - 0.18236)
 ```
+##### LSTM-v1:
+```
+C ROUGE-1 Average_R: 0.39289 (95%-conf.int. 0.39037 - 0.39537)
+C ROUGE-1 Average_P: 0.40210 (95%-conf.int. 0.39939 - 0.40500)
+C ROUGE-1 Average_F: 0.38322 (95%-conf.int. 0.38101 - 0.38563)
+
+C ROUGE-2 Average_R: 0.17302 (95%-conf.int. 0.17077 - 0.17537)
+C ROUGE-2 Average_P: 0.17902 (95%-conf.int. 0.17642 - 0.18162)
+C ROUGE-2 Average_F: 0.16941 (95%-conf.int. 0.16720 - 0.17173)
+
+C ROUGE-L Average_R: 0.36119 (95%-conf.int. 0.35873 - 0.36362)
+C ROUGE-L Average_P: 0.37002 (95%-conf.int. 0.36737 - 0.37298)
+C ROUGE-L Average_F: 0.35247 (95%-conf.int. 0.35025 - 0.35482)
+
+C ROUGE-SU4 Average_R: 0.17830 (95%-conf.int. 0.17624 - 0.18045)
+C ROUGE-SU4 Average_P: 0.18458 (95%-conf.int. 0.18225 - 0.18696)
+C ROUGE-SU4 Average_F: 0.17415 (95%-conf.int. 0.17214 - 0.17623)
+```
 
 ### How to run:
 - Download FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
