@@ -68,7 +68,7 @@ def init_modules():
     options["is_bidirectional"] = cfg.BI_RNN
     options["avg_nll"] = cfg.AVG_NLL
 
-    options["beam_decoding"] = True # False for greedy decoding
+    options["beam_decoding"] = cfg.BEAM_SEARCH # False for greedy decoding
     
     assert TRAINING_DATASET_CLS.IS_UNICODE == TESTING_DATASET_CLS.IS_UNICODE
     options["is_unicode"] = TRAINING_DATASET_CLS.IS_UNICODE # True Chinese dataet
@@ -105,8 +105,8 @@ def init_modules():
     consts["max_byte_predict"] = TESTING_DATASET_CLS.MAX_BYTE_PREDICT
     consts["testing_print_size"] = TESTING_DATASET_CLS.PRINT_SIZE
 
-    consts["lr"] = 0.15
-    consts["beam_size"] = 4
+    consts["lr"] = cfg.LR
+    consts["beam_size"] = cfg.BEAM_SIZE
 
     consts["max_epoch"] = 150 if options["is_debugging"] else 30 
     consts["print_time"] = 5
@@ -140,7 +140,7 @@ def greedy_decode(flist, batch, model, modules, consts, options):
     else:
         x, word_emb, dec_state, x_mask, y, len_y, ref_sents = batch
 
-    next_y = torch.LongTensor(-np.ones((1, testing_batch_size), dtype="int64")).cuda()
+    next_y = torch.LongTensor(-np.ones((1, testing_batch_size), dtype="int64")).to(options["device"])
 
     if options["cell"] == "lstm":
         dec_state = (dec_state, dec_state)
@@ -170,7 +170,7 @@ def greedy_decode(flist, batch, model, modules, consts, options):
             else:
                 next_y.append(modules["lfw_emb"]) # unk for copy mechanism
         next_y = np.array(next_y).reshape((1, testing_batch_size))
-        next_y = torch.LongTensor(next_y).cuda()
+        next_y = torch.LongTensor(next_y).to(options["device"])
 
         if options["coverage"]:
             acc_att = acc_att.view(testing_batch_size, acc_att.shape[-1])
@@ -235,7 +235,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
     sample_scores = np.zeros(beam_size)
 
     last_traces = [[]]
-    last_scores = torch.FloatTensor(np.zeros(1)).cuda()
+    last_scores = torch.FloatTensor(np.zeros(1)).to(options["device"])
     last_states = []
 
     if options["copy"]:
@@ -243,7 +243,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
     else:
         x, word_emb, dec_state, x_mask, y, len_y, ref_sents = batch
     
-    next_y = torch.LongTensor(-np.ones((1, num_live), dtype="int64")).cuda()
+    next_y = torch.LongTensor(-np.ones((1, num_live), dtype="int64")).to(options["device"])
     x = x.unsqueeze(1)
     word_emb = word_emb.unsqueeze(1)
     x_mask = x_mask.unsqueeze(1)
@@ -324,7 +324,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
         if num_live == 0 or num_dead >= beam_size:
             break
 
-        last_scores = torch.FloatTensor(np.array(last_scores).reshape((num_live, 1))).cuda()
+        last_scores = torch.FloatTensor(np.array(last_scores).reshape((num_live, 1))).to(options["device"])
         next_y = []
         for e in last_traces:
             eid = e[-1].item()
@@ -334,7 +334,7 @@ def beam_decode(fname, batch, model, modules, consts, options):
                 next_y.append(modules["lfw_emb"]) # unk for copy mechanism
 
         next_y = np.array(next_y).reshape((1, num_live))
-        next_y = torch.LongTensor(next_y).cuda()
+        next_y = torch.LongTensor(next_y).to(options["device"])
         if options["cell"] == "lstm":
             h_states = []
             c_states = []
@@ -457,26 +457,28 @@ def predict(model, modules, consts, options):
                                                              batch.x_mask, batch.y, batch.len_y, batch.y_mask, \
                                                              batch.original_summarys, batch.x_ext, batch.y_ext, batch.x_ext_words)
                     
-        word_emb, dec_state = model.encode(torch.LongTensor(x).cuda(), torch.LongTensor(len_x).cuda(), torch.FloatTensor(x_mask).cuda())
+        word_emb, dec_state = model.encode(torch.LongTensor(x).to(options["device"]),\
+                                           torch.LongTensor(len_x).to(options["device"]),\
+                                           torch.FloatTensor(x_mask).to(options["device"]))
 
         if options["beam_decoding"]:
             for idx_s in xrange(len(test_idx)):
                 if options["copy"]:
-                    inputx = (torch.LongTensor(x_ext[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
-                          torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s],\
+                    inputx = (torch.LongTensor(x_ext[:, idx_s]).to(options["device"]), word_emb[:, idx_s, :], dec_state[idx_s, :],\
+                          torch.FloatTensor(x_mask[:, idx_s, :]).to(options["device"]), y[:, idx_s], [len_y[idx_s]], oy[idx_s],\
                           batch.max_ext_len, oovs[idx_s])
                 else:
-                    inputx = (torch.LongTensor(x[:, idx_s]).cuda(), word_emb[:, idx_s, :], dec_state[idx_s, :],\
-                          torch.FloatTensor(x_mask[:, idx_s, :]).cuda(), y[:, idx_s], [len_y[idx_s]], oy[idx_s])
+                    inputx = (torch.LongTensor(x[:, idx_s]).to(options["device"]), word_emb[:, idx_s, :], dec_state[idx_s, :],\
+                          torch.FloatTensor(x_mask[:, idx_s, :]).to(options["device"]), y[:, idx_s], [len_y[idx_s]], oy[idx_s])
 
                 beam_decode(si, inputx, model, modules, consts, options)
                 si += 1
         else:
             if options["copy"]:
-                inputx = (torch.LongTensor(x_ext).cuda(), word_emb, dec_state, \
-                          torch.FloatTensor(x_mask).cuda(), y, len_y, oy, batch.max_ext_len, oovs)
+                inputx = (torch.LongTensor(x_ext).to(options["device"]), word_emb, dec_state, \
+                          torch.FloatTensor(x_mask).to(options["device"]), y, len_y, oy, batch.max_ext_len, oovs)
             else:
-                inputx = (torch.LongTensor(x).cuda(), word_emb, dec_state, torch.FloatTensor(x_mask).cuda(), y, len_y, oy)
+                inputx = (torch.LongTensor(x).to(options["device"]), word_emb, dec_state, torch.FloatTensor(x_mask).to(options["device"]), y, len_y, oy)
             greedy_decode(test_idx, inputx, model, modules, consts, options)
             si += len(test_idx)
 
@@ -558,9 +560,10 @@ def run(existing_model_name = None):
                                                              batch.original_summarys, batch.x_ext, batch.y_ext, batch.x_ext_words)
                     
                     model.zero_grad()
-                    y_pred, cost, cost_c = model(torch.LongTensor(x).cuda(), torch.LongTensor(len_x).cuda(),\
-                                   torch.LongTensor(y).cuda(),  torch.FloatTensor(x_mask).cuda(), \
-                                   torch.FloatTensor(y_mask).cuda(), torch.LongTensor(x_ext).cuda(), torch.LongTensor(y_ext).cuda(), \
+                    y_pred, cost, cost_c = model(torch.LongTensor(x).to(options["device"]), torch.LongTensor(len_x).to(options["device"]),\
+                                   torch.LongTensor(y).to(options["device"]),  torch.FloatTensor(x_mask).to(options["device"]), \
+                                   torch.FloatTensor(y_mask).to(options["device"]), torch.LongTensor(x_ext).to(options["device"]),\
+                                   torch.LongTensor(y_ext).to(options["device"]), \
                                    batch.max_ext_len)
                     if cost_c is None:
                         loss = cost
