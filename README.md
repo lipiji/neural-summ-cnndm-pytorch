@@ -100,6 +100,7 @@ C ROUGE-SU4 Average_F: 0.17415 (95%-conf.int. 0.17214 - 0.17623)
 ```
 
 ### How to run:
+- Python 2.7, Pytorch 0.4
 - Download FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
 - Run python prepare_data.py
 - Training: python main.py | tee train.log
