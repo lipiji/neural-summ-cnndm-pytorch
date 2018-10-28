@@ -56,7 +56,7 @@ class Model(nn.Module):
             init_lstm_weight(self.encoder)
         init_linear_weight(self.get_dec_init_state)
     
-    def categorical_crossentropy(self, y_pred, y, y_mask, avg=True):
+    def nll_loss(self, y_pred, y, y_mask, avg=True):
         cost = -T.log(T.gather(y_pred, 2, y.view(y.size(0), y.size(1), 1)))
         cost = cost.view(y.shape)
         y_mask = y_mask.view(y.shape)
@@ -130,10 +130,10 @@ class Model(nn.Module):
         
         if self.copy:
             y_pred = self.word_prob(dec_status, atted_context, y_shifted, att_dist, xids, max_ext_len)
-            cost = self.categorical_crossentropy(y_pred, y_ext, mask_y, self.avg_nll)
+            cost = self.nll_loss(y_pred, y_ext, mask_y, self.avg_nll)
         else:
             y_pred = self.word_prob(dec_status, atted_context, y_shifted)
-            cost = self.categorical_crossentropy(y_pred, y, mask_y, self.avg_nll)
+            cost = self.nll_loss(y_pred, y, mask_y, self.avg_nll)
         
         if self.coverage:
             cost_c = T.mean(T.sum(T.min(att_dist, C), 2))
