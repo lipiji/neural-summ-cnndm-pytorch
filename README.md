@@ -98,6 +98,24 @@ C ROUGE-SU4 Average_R: 0.17830 (95%-conf.int. 0.17624 - 0.18045)
 C ROUGE-SU4 Average_P: 0.18458 (95%-conf.int. 0.18225 - 0.18696)
 C ROUGE-SU4 Average_F: 0.17415 (95%-conf.int. 0.17214 - 0.17623)
 ```
+##### LSTM-v2:
+```
+C ROUGE-1 Average_R: 0.44682 (95%-conf.int. 0.44410 - 0.44951)
+C ROUGE-1 Average_P: 0.38253 (95%-conf.int. 0.38000 - 0.38540)
+C ROUGE-1 Average_F: 0.39721 (95%-conf.int. 0.39515 - 0.39942)
+
+C ROUGE-2 Average_R: 0.19413 (95%-conf.int. 0.19170 - 0.19660)
+C ROUGE-2 Average_P: 0.16723 (95%-conf.int. 0.16504 - 0.16966)
+C ROUGE-2 Average_F: 0.17281 (95%-conf.int. 0.17068 - 0.17504)
+
+C ROUGE-L Average_R: 0.40573 (95%-conf.int. 0.40313 - 0.40823)
+C ROUGE-L Average_P: 0.34777 (95%-conf.int. 0.34529 - 0.35047)
+C ROUGE-L Average_F: 0.36088 (95%-conf.int. 0.35872 - 0.36306)
+
+C ROUGE-SU4 Average_R: 0.20127 (95%-conf.int. 0.19916 - 0.20358)
+C ROUGE-SU4 Average_P: 0.17288 (95%-conf.int. 0.17085 - 0.17507)
+C ROUGE-SU4 Average_F: 0.17845 (95%-conf.int. 0.17658 - 0.18044)
+```
 
 ### How to run:
 - Python 2.7, Pytorch 0.4
