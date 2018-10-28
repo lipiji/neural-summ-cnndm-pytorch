@@ -100,21 +100,21 @@ C ROUGE-SU4 Average_F: 0.17415 (95%-conf.int. 0.17214 - 0.17623)
 ```
 ##### LSTM-v2:
 ```
-C ROUGE-1 Average_R: 0.44682 (95%-conf.int. 0.44410 - 0.44951)
-C ROUGE-1 Average_P: 0.38253 (95%-conf.int. 0.38000 - 0.38540)
-C ROUGE-1 Average_F: 0.39721 (95%-conf.int. 0.39515 - 0.39942)
+C ROUGE-1 Average_R: 0.47530 (95%-conf.int. 0.47261 - 0.47799)
+C ROUGE-1 Average_P: 0.36793 (95%-conf.int. 0.36539 - 0.37076)
+C ROUGE-1 Average_F: 0.39858 (95%-conf.int. 0.39653 - 0.40091)
 
-C ROUGE-2 Average_R: 0.19413 (95%-conf.int. 0.19170 - 0.19660)
-C ROUGE-2 Average_P: 0.16723 (95%-conf.int. 0.16504 - 0.16966)
-C ROUGE-2 Average_F: 0.17281 (95%-conf.int. 0.17068 - 0.17504)
+C ROUGE-2 Average_R: 0.20904 (95%-conf.int. 0.20654 - 0.21162)
+C ROUGE-2 Average_P: 0.16263 (95%-conf.int. 0.16028 - 0.16500)
+C ROUGE-2 Average_F: 0.17544 (95%-conf.int. 0.17329 - 0.17767)
 
-C ROUGE-L Average_R: 0.40573 (95%-conf.int. 0.40313 - 0.40823)
-C ROUGE-L Average_P: 0.34777 (95%-conf.int. 0.34529 - 0.35047)
-C ROUGE-L Average_F: 0.36088 (95%-conf.int. 0.35872 - 0.36306)
+C ROUGE-L Average_R: 0.43153 (95%-conf.int. 0.42895 - 0.43424)
+C ROUGE-L Average_P: 0.33433 (95%-conf.int. 0.33184 - 0.33705)
+C ROUGE-L Average_F: 0.36205 (95%-conf.int. 0.35993 - 0.36431)
 
-C ROUGE-SU4 Average_R: 0.20127 (95%-conf.int. 0.19916 - 0.20358)
-C ROUGE-SU4 Average_P: 0.17288 (95%-conf.int. 0.17085 - 0.17507)
-C ROUGE-SU4 Average_F: 0.17845 (95%-conf.int. 0.17658 - 0.18044)
+C ROUGE-SU4 Average_R: 0.21671 (95%-conf.int. 0.21453 - 0.21904)
+C ROUGE-SU4 Average_P: 0.16766 (95%-conf.int. 0.16552 - 0.16992)
+C ROUGE-SU4 Average_F: 0.18085 (95%-conf.int. 0.17896 - 0.18289)
 ```
 
 ### How to run:
