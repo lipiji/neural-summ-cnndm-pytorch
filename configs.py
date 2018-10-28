@@ -37,7 +37,7 @@ class DeepmindConfigs():
     
     cc = CommonConfigs("deepmind")
    
-    CELL = "gru"
+    CELL = "gru" # gru or lstm
     CUDA = True
     COPY = True
     COVERAGE = True

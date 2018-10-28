@@ -77,13 +77,13 @@ class LSTMAttentionDecoder(nn.Module):
                 word_atten = _get_word_atten(pctx, s, x_mask)
             atted_ctx = T.sum(word_atten * context, 0)
 
-            ifoc_preact1 = F.linear(h1, self.Ux) + F.linear(atted_ctx, self.Wx, self.bx)
-            x4i1, x4f1, x4o1, x4c1 = ifoc_preact1.chunk(4, 1)
-            i1 = torch.sigmoid(x4i1)
-            f1 = torch.sigmoid(x4f1)
-            o1 = torch.sigmoid(x4o1)
-            c2 = f1 * c1 + i1 * torch.tanh(x4c1)
-            h2 = o1 * torch.tanh(c2)
+            ifoc_preact = F.linear(h1, self.Ux) + F.linear(atted_ctx, self.Wx, self.bx)
+            x4i, x4f, x4o, x4c = ifoc_preact.chunk(4, 1)
+            i = torch.sigmoid(x4i)
+            f = torch.sigmoid(x4f)
+            o = torch.sigmoid(x4o)
+            c2 = f * c1 + i * torch.tanh(x4c)
+            h2 = o * torch.tanh(c2)
             c2 = y_mask * c2 + (1.0 - y_mask) * c1
             h2 = y_mask * h2 + (1.0 - y_mask) * h1
 
