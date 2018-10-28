@@ -9,7 +9,7 @@ from torch.autograd import Variable
 
 from utils_pg import *
 from gru_dec import *
-from lstm_dec import *
+from lstm_dec_v2 import *
 from word_prob_layer import *
 
 class Model(nn.Module):
