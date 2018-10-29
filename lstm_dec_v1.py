@@ -79,13 +79,7 @@ class LSTMAttentionDecoder(nn.Module):
             else:
                 return (h1, c1), h1, atted_ctx, word_atten_
 
-        hs = []
-        cs = []
-        ss = []
-        atts = []
-        dists = [] 
-        xids = []
-        Cs = []
+        hs, cs, ss, atts, dists, xids, Cs = [], [], [], [], [], [], []
         hidden = init_state
         acc_att = init_coverage
         if self.copy: 
@@ -97,31 +91,31 @@ class LSTMAttentionDecoder(nn.Module):
         steps = range(y_emb.size(0))
         for i in steps:
             if self.coverage:
-                Cs.append(acc_att)
+                Cs += [acc_att]
                 hidden, s, att, att_dist, acc_att = recurrence(x[i], y_mask[i], hidden, pctx, context, x_mask, acc_att)
             else:
                 hidden, s, att, att_dist = recurrence(x[i], y_mask[i], hidden, pctx,context, x_mask)
-            hs.append(hidden[0])
-            cs.append(hidden[1])
-            ss.append(s)
-            atts.append(att)
-            dists.append(att_dist)
-            xids.append(xid)
+            hs += [hidden[0]]
+            cs += [hidden[1]]
+            ss += [s]
+            atts += [att]
+            dists += [att_dist]
+            xids += [xid]
         
         if self.coverage:
             if self.is_predicting :
-                Cs.append(acc_att)
+                Cs += [acc_att]
                 Cs = Cs[1:]
-            Cs = T.cat(Cs, 0).view(y_emb.size(0), *Cs[0].size())
+            Cs = T.stack(Cs).view(y_emb.size(0), *Cs[0].size())
         
 
-        hs = T.cat(hs, 0).view(y_emb.size(0), *hs[0].size())
-        cs = T.cat(cs, 0).view(y_emb.size(0), *cs[0].size())
-        ss = T.cat(ss, 0).view(y_emb.size(0), *ss[0].size())
-        atts = T.cat(atts, 0).view(y_emb.size(0), *atts[0].size())
-        dists = T.cat(dists, 0).view(y_emb.size(0), *dists[0].size())
+        hs = T.stack(hs).view(y_emb.size(0), *hs[0].size())
+        cs = T.stack(cs).view(y_emb.size(0), *cs[0].size())
+        ss = T.stack(ss).view(y_emb.size(0), *ss[0].size())
+        atts = T.stack(atts).view(y_emb.size(0), *atts[0].size())
+        dists = T.stack(dists).view(y_emb.size(0), *dists[0].size())
         if self.copy:
-            xids = T.cat(xids, 0).view(y_emb.size(0), *xids[0].size())
+            xids = T.stack(xids).view(y_emb.size(0), *xids[0].size())
         
         if self.copy and self.coverage:
             return (hs, cs), ss, atts, dists, xids, Cs
