@@ -47,8 +47,9 @@ class WordProbLayer(nn.Module):
         y_dec = T.softmax(logit, dim = 2)
         
         if self.copy:
-            ext_zeros = Variable(torch.zeros(y_dec.size(0), y_dec.size(1), max_ext_len)).to(self.device)
-            y_dec = T.cat((y_dec, ext_zeros), 2)
+            if max_ext_len > 0:
+                ext_zeros = Variable(torch.zeros(y_dec.size(0), y_dec.size(1), max_ext_len)).to(self.device)
+                y_dec = T.cat((y_dec, ext_zeros), 2)
             g = T.sigmoid(F.linear(h, self.v, self.bv))
             y_dec = (g * y_dec).scatter_add(2, xids, (1 - g) * att_dist)
         
