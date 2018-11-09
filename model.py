@@ -63,7 +63,7 @@ class Model(nn.Module):
         if avg:
             cost = T.sum(cost * y_mask, 0) / T.sum(y_mask, 0)
         else:
-            cost = T.sum(cost * y_mask.view(y.shape), 0)
+            cost = T.sum(cost * y_mask, 0)
         cost = cost.view((y.size(1), -1))
         return T.mean(cost) 
 
