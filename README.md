@@ -80,7 +80,7 @@ C ROUGE-SU4 Average_R: 0.21030 (95%-conf.int. 0.20801 - 0.21277)
 C ROUGE-SU4 Average_P: 0.16956 (95%-conf.int. 0.16745 - 0.17182)
 C ROUGE-SU4 Average_F: 0.18028 (95%-conf.int. 0.17835 - 0.18236)
 ```
-##### LSTM-v1 （avg NLL loss + norm-clip=2）:
+##### LSTM-v1 （avg NLL loss + norm-clip=2）: Pointer-Generator in ACL'17
 ```
 C ROUGE-1 Average_R: 0.39289 (95%-conf.int. 0.39037 - 0.39537)
 C ROUGE-1 Average_P: 0.40210 (95%-conf.int. 0.39939 - 0.40500)
