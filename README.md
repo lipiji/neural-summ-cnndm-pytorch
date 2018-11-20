@@ -80,7 +80,7 @@ C ROUGE-SU4 Average_R: 0.21030 (95%-conf.int. 0.20801 - 0.21277)
 C ROUGE-SU4 Average_P: 0.16956 (95%-conf.int. 0.16745 - 0.17182)
 C ROUGE-SU4 Average_F: 0.18028 (95%-conf.int. 0.17835 - 0.18236)
 ```
-##### LSTM-v1:
+##### LSTM-v1 （avg NLL loss + norm-clip=2）:
 ```
 C ROUGE-1 Average_R: 0.39289 (95%-conf.int. 0.39037 - 0.39537)
 C ROUGE-1 Average_P: 0.40210 (95%-conf.int. 0.39939 - 0.40500)
@@ -98,7 +98,7 @@ C ROUGE-SU4 Average_R: 0.17830 (95%-conf.int. 0.17624 - 0.18045)
 C ROUGE-SU4 Average_P: 0.18458 (95%-conf.int. 0.18225 - 0.18696)
 C ROUGE-SU4 Average_F: 0.17415 (95%-conf.int. 0.17214 - 0.17623)
 ```
-##### LSTM-v2:
+##### LSTM-v2 （avg NLL loss + norm-clip=2）:
 ```
 ---------------------------------------------
 C ROUGE-1 Average_R: 0.43865 (95%-conf.int. 0.43618 - 0.44132)
