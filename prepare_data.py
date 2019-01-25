@@ -4,15 +4,12 @@ from os import makedirs
 from os.path import exists
 import argparse
 from configs import *
-import cPickle as pickle
+import pickle
 import numpy as np
 import re
 from random import shuffle
 import string
 import struct
-
-from tensorflow.core.example import example_pb2
-
 
 def run(d_type, d_path):
     prepare_deepmind(d_path)
@@ -32,26 +29,17 @@ def get_xy_tuple(cont, head, cfg):
 def load_lines(d_path, f_name,  configs):
     lines = []
     f_path = d_path + f_name
-    reader = open(f_path, 'rb')
-    while True:
-        len_bytes = reader.read(8)
-        if not len_bytes: break # finished reading this file
-        str_len = struct.unpack('q', len_bytes)[0]
-        example_str = struct.unpack('%ds' % str_len, reader.read(str_len))[0]
-        e = example_pb2.Example.FromString(example_str)
-        try:
-            article_text = e.features.feature['article'].bytes_list.value[0] # the article text was saved under the key 'article' in the data files
-            abstract_text = e.features.feature['abstract'].bytes_list.value[0] # the abstract text was saved under the key 'abstract' in the data files
-        except ValueError:
-            print "ValueError"
-            continue
-        if len(article_text)==0: # See https://github.com/abisee/pointer-generator/issues/1
-            print 'Found an example with empty article text. Skipping it.'
-        else:
-            xy_tuple = get_xy_tuple(article_text, abstract_text, configs)
+    with open(f_path, 'r') as f:
+        for line in f:
+            line = line.strip("\n").lower()
+            fs = line.split("<summ-content>")
+            if len(fs) == 2:
+                xy_tuple = get_xy_tuple(fs[1], fs[0], configs)
+            else:
+                print("ERROR:" + line)
+                continue
             if xy_tuple != None:
                 lines.append(xy_tuple)
-    reader.close()
     return lines
 
 def load_dict(d_path, f_name, dic, dic_list):
@@ -61,8 +49,11 @@ def load_dict(d_path, f_name, dic, dic_list):
         line = line.strip('\n').strip('\r').lower()
         if line:
             tf = line.split()
-            dic[tf[0]] = int(tf[1])
-            dic_list.append(tf[0])
+            if len(tf) == 2:
+                dic[tf[0]] = int(tf[1])
+                dic_list.append(tf[0])
+            else:
+                print("error:", line)
     return dic, dic_list
 
 def to_dict(xys, dic):
@@ -140,12 +131,12 @@ def prepare_deepmind(d_path):
     SUMM_PATH = configs.cc.SUMM_PATH
     TMP_PATH = configs.cc.TMP_PATH
 
-    print "train: " + TRAINING_PATH
-    print "test: " + TESTING_PATH
-    print "validate: " + VALIDATE_PATH 
-    print "result: " + RESULT_PATH
-    print "model: " + MODEL_PATH
-    print "tmp: " + TMP_PATH
+    print ("train: " + TRAINING_PATH)
+    print ("test: " + TESTING_PATH)
+    print ("validate: " + VALIDATE_PATH) 
+    print ("result: " + RESULT_PATH)
+    print ("model: " + MODEL_PATH)
+    print ("tmp: " + TMP_PATH)
 
     if not exists(TRAINING_PATH):
         makedirs(TRAINING_PATH)
@@ -169,14 +160,14 @@ def prepare_deepmind(d_path):
         makedirs(TMP_PATH)
     
         
-    print "trainset..."
-    train_xy_list = load_lines(d_path, "train.bin", configs)
+    print ("trainset...")
+    train_xy_list = load_lines(d_path, "train.txt", configs)
     
-    print "dump train..."
+    print ("dump train...")
     pickle.dump(train_xy_list, open(TRAINING_PATH + "train.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     
 
-    print "fitering and building dict..."    
+    print ("fitering and building dict...")
     use_abisee = True
     all_dic1 = {}
     all_dic2 = {}
@@ -217,32 +208,32 @@ def prepare_deepmind(d_path):
 
     assert len(hfw) == len(dic)
     assert len(w2i) == len(dic)
-    print "dump dict..."
+    print ("dump dict...")
     pickle.dump([all_dic1, dic, hfw, w2i, i2w, w2w], open(TRAINING_PATH + "dic.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     
-    print "testset..."
-    test_xy_list = load_lines(d_path, "test.bin", configs)
+    print ("testset...")
+    test_xy_list = load_lines(d_path, "test.txt", configs)
 
-    print "validset..."
-    valid_xy_list = load_lines(d_path, "val.bin", configs)
+    print ("validset...")
+    valid_xy_list = load_lines(d_path, "val.txt", configs)
 
 
-    print "#train = ", len(train_xy_list)
-    print "#test = ", len(test_xy_list)
-    print "#validate = ", len(valid_xy_list)
+    print ("#train = ", len(train_xy_list))
+    print ("#test = ", len(test_xy_list))
+    print ("#validate = ", len(valid_xy_list))
         
-    print "#all_dic = ", len(all_dic1), ", #dic = ", len(dic), ", #hfw = ", len(hfw)
+    print ("#all_dic = ", len(all_dic1), ", #dic = ", len(dic), ", #hfw = ", len(hfw))
 
-    print "dump test..."
+    print ("dump test...")
     pickle.dump(test_xy_list, open(TESTING_PATH + "test.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     shuffle(test_xy_list)
     pickle.dump(test_xy_list[0:2000], open(TESTING_PATH + "pj2000.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
 
-    print "dump validate..."
+    print ("dump validate...")
     pickle.dump(valid_xy_list, open(VALIDATE_PATH + "valid.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     pickle.dump(valid_xy_list[0:1000], open(VALIDATE_PATH + "pj1000.pkl", "wb"), protocol = pickle.HIGHEST_PROTOCOL)
     
-    print "done."
+    print ("done.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -251,7 +242,7 @@ if __name__ == "__main__":
 
     data_type = "deepmind"
     # download from finished_files: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail
-    raw_path = "./data/CNN-Dailymail/finished_files/"
+    raw_path = "/home/pijili/data/summarization-data/SDS/cnndm-pj/"
 
-    print data_type, raw_path
+    print (data_type, raw_path)
     run(data_type, raw_path)

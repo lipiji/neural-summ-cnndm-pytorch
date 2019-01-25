@@ -6,7 +6,7 @@ import os.path
 import time
 from operator import itemgetter
 import numpy as np
-import cPickle as pickle
+import pickle
 from random import shuffle
 
 class BatchData:
@@ -29,11 +29,11 @@ class BatchData:
         i2w = modules["i2w"]
         dict_size = len(w2i)
 
-        for idx_doc in xrange(len(flist)):
+        for idx_doc in range(len(flist)):
             if len(flist[idx_doc]) == 2:
                 contents, summarys = flist[idx_doc]
             else:
-                print "ERROR!"
+                print ("ERROR!")
                 return
             
             content, original_content = contents
@@ -41,7 +41,7 @@ class BatchData:
             self.original_contents.append(original_content)
             self.original_summarys.append(original_summary)
             xi_oovs = []
-            for idx_word in xrange(len(content)):
+            for idx_word in range(len(content)):
                     # some sentences in duc is longer than len_x
                     if idx_word == consts["len_x"]:
                         break
@@ -63,7 +63,7 @@ class BatchData:
                 self.max_ext_len = len(xi_oovs)
 
             if options["has_y"]:
-                for idx_word in xrange(len(summary)):
+                for idx_word in range(len(summary)):
                     w = summary[idx_word]
                     
                     if w not in w2i:
@@ -98,12 +98,12 @@ def batched(x_size, options, consts):
     batch_size = consts["testing_batch_size"] if options["is_predicting"] else consts["batch_size"]
     if options["is_debugging"]:
         x_size = 13
-    ids = [i for i in xrange(x_size)]
+    ids = [i for i in range(x_size)]
     if not options["is_predicting"]:
         shuffle(ids)
     batch_list = []
     batch_ids = []
-    for i in xrange(x_size):
+    for i in range(x_size):
         idx = ids[i]
         batch_ids.append(idx)
         if len(batch_ids) == batch_size or i == (x_size - 1):
