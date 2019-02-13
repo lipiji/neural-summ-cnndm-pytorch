@@ -120,7 +120,7 @@ C ROUGE-SU4 Average_F: 0.18040 (95%-conf.int. 0.17845 - 0.18253)
 
 ### How to run:
 - Python 3.7, Pytorch 0.4
-- Download FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and put it under ./data/
+- Download the processed dataset from: https://drive.google.com/file/d/1EUuEMBSlrlnf_J2jcAVl1v4owSvw_8ZF/view?usp=sharing , or you can download the original FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and process by yourself.
 - Run python prepare_data.py
 - Training: python main.py | tee train.log
 - Tuning: modify main.py: is_predicting=true and model_selection=true, then run "bash tuning_deepmind.sh | tee tune.log"
