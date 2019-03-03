@@ -119,10 +119,10 @@ C ROUGE-SU4 Average_F: 0.18040 (95%-conf.int. 0.17845 - 0.18253)
 ```
 
 ### How to run:
-- Python 3.7, Pytorch 0.4
+- Python 3.7, Pytorch 0.4+
 - Download the processed dataset from: https://drive.google.com/file/d/1EUuEMBSlrlnf_J2jcAVl1v4owSvw_8ZF/view?usp=sharing , or you can download the original FINISHED_FILES from: https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail , and process by yourself.
-- Run python prepare_data.py
-- Training: python main.py | tee train.log
+- Modify the path in prepare_data.py then run it: python prepare_data.py
+- Training: python -u main.py | tee train.log
 - Tuning: modify main.py: is_predicting=true and model_selection=true, then run "bash tuning_deepmind.sh | tee tune.log"
 - Testing: modify main.py: is_predicting=true and model_selection=false, then run "python main.py you-best-model (say cnndm.s2s.gpu4.epoch7.1)", go to "./deepmind/result/" and run  $ROUGE$ myROUGE_Config.xml C, you will get the results.
 - The Perl Rouge package is enough, I did not use pyrouge.
